@@ -1,7 +1,7 @@
 {
   "name": "prd-agent",
   "version": "0.1.0",
-  "description": "A CLI task management tool",
+  "description": "A CLI task management tool with AI",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -9,8 +9,9 @@
   },
   "scripts": {
     "dev": "tsx watch src/cli.ts",
+    "start": "tsx src/cli.ts",
+    "repl": "tsx src/cli.ts",
     "build": "tsup",
-    "start": "node dist/cli.js",
     "typecheck": "tsc --noEmit"
   },
   "keywords": ["cli", "task", "management", "terminal"],

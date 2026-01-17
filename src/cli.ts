@@ -10,6 +10,7 @@ import { complete } from './commands/complete.js';
 import { search } from './commands/search.js';
 import { listTags } from './commands/tags.js';
 import { setApiCmd, showConfig, aiGenerate, aiAnalyze, aiSummary } from './commands/ai.js';
+import { REPL } from './core/repl.js';
 import { printInfo } from './ui/printer.js';
 
 const program = new Command();
@@ -18,6 +19,17 @@ program
   .name('prd')
   .description('A CLI task management tool with AI')
   .version('0.1.0');
+
+// 交互模式 (默认)
+program
+  .command('interactive', { isDefault: true })
+  .alias('repl')
+  .alias('shell')
+  .description('Start interactive REPL mode')
+  .action(async () => {
+    const repl = new REPL();
+    await repl.start();
+  });
 
 // 添加任务
 program
@@ -116,11 +128,6 @@ program
   .command('summary')
   .description('AI summarize your tasks')
   .action(aiSummary);
-
-// 默认命令 - 显示帮助
-program.action(() => {
-  printInfo('Run "prd --help" to see available commands.');
-});
 
 // 解析参数
 program.parseAsync(process.argv).catch((error) => {
