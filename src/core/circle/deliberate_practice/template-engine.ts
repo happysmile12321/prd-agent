@@ -10,9 +10,9 @@ import type {
   WorkflowStep,
   Technique,
   TemplateStats,
-} from '../../types/template.js';
+} from '../../../types/template.js';
 
-import { TemplateStatus } from '../../types/template.js';
+import { TemplateStatus } from '../../../types/template.js';
 
 export class TemplateEngine {
   private templates: Map<string, PracticeTemplate> = new Map();

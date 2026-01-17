@@ -17,7 +17,7 @@ import type {
   WorkflowChange,
   WorkflowStep,
   PracticeSession,
-} from '../../types/template.js';
+} from '../../../types/template.js';
 
 export interface ReflectionInput {
   /** 练习组数据 */

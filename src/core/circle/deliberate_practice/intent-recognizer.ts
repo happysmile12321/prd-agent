@@ -8,7 +8,7 @@ import type {
   PracticeTemplate,
   Trigger,
   Trap,
-} from '../../types/template.js';
+} from '../../../types/template.js';
 
 export interface RecognitionResult {
   /** 匹配的模板 */

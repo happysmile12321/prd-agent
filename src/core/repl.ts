@@ -4,6 +4,24 @@ import { setApiKey } from './config.js';
 import { chat, clearHistory, getHistory, ask, generateCode, reviewCode, explainCode, summarizeText, polishText, translateText } from './ai.js';
 import { printSuccess, printError, printInfo } from '../ui/printer.js';
 import { initDB, analyzeMarkdown, generateSummary, generateQuizQuestions, evaluateAnswer, getAllTasks, getNotes, getQuizResults } from './circle/spr/index.js';
+import {
+  initDB as initPracticeDB,
+  createTemplate,
+  listTemplates,
+  getTemplate,
+  updateTemplateStatus,
+  deleteTemplate,
+  getTemplateStats,
+  createPracticeGroup,
+  generateScenario,
+  startPracticeSession,
+  completePracticeSession,
+  getPracticeGroupStats,
+  generateReflection,
+  recognizeIntent,
+  PracticeLevel,
+  ProblemComplexity,
+} from './circle/deliberate_practice/index.js';
 
 // 命令类型
 interface Command {
@@ -151,6 +169,14 @@ export class REPL {
       aliases: [],
       description: 'SPR learning module. Usage: spr <command> [args]',
       handler: async (args) => this.cmdSpr(args),
+    });
+
+    // 刻意练习模块
+    this.register({
+      name: 'practice',
+      aliases: ['pr', 'dp'],
+      description: 'Deliberate Practice module. Usage: practice <command> [args]',
+      handler: async (args) => this.cmdPractice(args),
     });
 
     // 配置
@@ -721,6 +747,329 @@ export class REPL {
       });
     } catch (error) {
       printError(`Failed to get results: ${(error as Error).message}`);
+    }
+  }
+
+  // 刻意练习模块命令处理
+  private async cmdPractice(args: string[]): Promise<void> {
+    const subCommand = args[0]?.toLowerCase();
+
+    if (!subCommand) {
+      this.showPracticeHelp();
+      return;
+    }
+
+    // 初始化数据库
+    await initPracticeDB();
+
+    switch (subCommand) {
+      case 'list':
+      case 'ls':
+        await this.practiceList(args.slice(1));
+        break;
+      case 'create':
+        await this.practiceCreate(args.slice(1));
+        break;
+      case 'show':
+      case 'info':
+        await this.practiceShow(args.slice(1));
+        break;
+      case 'status':
+        await this.practiceStatus(args.slice(1));
+        break;
+      case 'delete':
+      case 'rm':
+        await this.practiceDelete(args.slice(1));
+        break;
+      case 'start':
+        await this.practiceStart(args.slice(1));
+        break;
+      case 'scenario':
+        await this.practiceScenario(args.slice(1));
+        break;
+      case 'reflect':
+        await this.practiceReflect(args.slice(1));
+        break;
+      case 'recognize':
+      case 'rec':
+        await this.practiceRecognize(args.slice(1));
+        break;
+      default:
+        printError(`Unknown practice command: ${subCommand}`);
+        this.showPracticeHelp();
+    }
+  }
+
+  private showPracticeHelp(): void {
+    console.log();
+    console.log('  \x1b[36mDeliberate Practice Module:\x1b[0m');
+    console.log();
+    console.log('  \x1b[33mTemplate Management:\x1b[0m');
+    console.log('    list [filters]          List all templates');
+    console.log('    create <name> <subject>  Create a new template (interactive)');
+    console.log('    show <id>               Show template details');
+    console.log('    status <id> <status>     Update template status (pending/mastered/rework)');
+    console.log('    delete <id>             Delete a template');
+    console.log();
+    console.log('  \x1b[33mPractice:\x1b[0m');
+    console.log('    start <templateId>      Create a practice group');
+    console.log('    scenario <templateId>    Generate a practice scenario');
+    console.log('    reflect <groupId>       Generate reflection for completed practice');
+    console.log();
+    console.log('  \x1b[33mIntent Recognition:\x1b[0m');
+    console.log('    recognize <input>        Match intent to existing templates');
+    console.log();
+  }
+
+  private async practiceList(args: string[]): Promise<void> {
+    try {
+      const filters: any = {};
+      for (const arg of args) {
+        if (['pending', 'mastered', 'rework'].includes(arg)) {
+          filters.status = arg;
+        } else if (['T1', 'T2'].includes(arg)) {
+          filters.level = arg;
+        } else {
+          filters.subject = arg;
+        }
+      }
+
+      const templates = await listTemplates(
+        Object.keys(filters).length > 0 ? filters : undefined
+      );
+
+      console.log();
+      console.log('  \x1b[36mPractice Templates:\x1b[0m');
+      console.log();
+
+      if (templates.length === 0) {
+        console.log('  No templates found.');
+        console.log();
+        return;
+      }
+
+      templates.forEach((t: any) => {
+        const statusEmoji = t.status === 'mastered' ? '✓' : t.status === 'rework' ? '↺' : '○';
+        console.log(`  ${statusEmoji} \x1b[33m${t.name}\x1b[0m (${t.id})`);
+        console.log(`     Subject: ${t.subject} | Chapter: ${t.chapter}`);
+        console.log(`     Level: ${t.level} | Status: ${t.status}`);
+        console.log();
+      });
+    } catch (error) {
+      printError(`Failed to list templates: ${(error as Error).message}`);
+    }
+  }
+
+  private async practiceCreate(args: string[]): Promise<void> {
+    const name = args[0];
+    if (!name) {
+      printError('Template name is required. Usage: practice create <name>');
+      return;
+    }
+
+    // 简化版本：创建一个基本模板
+    try {
+      const subject = args[1] || 'general';
+      const chapter = args[2] || 'default';
+      const level = args[3]?.toUpperCase() === 'T1' ? PracticeLevel.T1 : PracticeLevel.T2;
+
+      const id = await createTemplate(
+        name,
+        subject,
+        chapter,
+        level,
+        [{ id: 'obj1', title: 'Master the skill', keyResults: [] }],
+        [], // triggers
+        [], // traps
+        'Practice workflow', // workflow
+        [] // techniques
+      );
+
+      printSuccess(`Template created with ID: ${id}`);
+      console.log(`  Use 'practice show ${id}' to view details`);
+    } catch (error) {
+      printError(`Failed to create template: ${(error as Error).message}`);
+    }
+  }
+
+  private async practiceShow(args: string[]): Promise<void> {
+    const id = args[0];
+    if (!id) {
+      printError('Template ID is required. Usage: practice show <id>');
+      return;
+    }
+
+    try {
+      const template = await getTemplate(id);
+      if (!template) {
+        printError('Template not found');
+        return;
+      }
+
+      console.log();
+      console.log('  \x1b[36mTemplate Details:\x1b[0m');
+      console.log();
+      console.log(`  \x1b[33mName:\x1b[0m ${template.name}`);
+      console.log(`  \x1b[33mID:\x1b[0m ${template.id}`);
+      console.log(`  \x1b[33mSubject:\x1b[0m ${template.subject}`);
+      console.log(`  \x1b[33mChapter:\x1b[0m ${template.chapter}`);
+      console.log(`  \x1b[33mLevel:\x1b[0m ${template.level}`);
+      console.log(`  \x1b[33mStatus:\x1b[0m ${template.status}`);
+      console.log(`  \x1b[33mObjectives:\x1b[0m`);
+      template.objectives.forEach((obj: any) => {
+        console.log(`    - ${obj.title}`);
+      });
+      console.log();
+    } catch (error) {
+      printError(`Failed to get template: ${(error as Error).message}`);
+    }
+  }
+
+  private async practiceStatus(args: string[]): Promise<void> {
+    const id = args[0];
+    const status = args[1]?.toLowerCase();
+
+    if (!id || !status) {
+      printError('Usage: practice status <id> <pending|mastered|rework> [reason]');
+      return;
+    }
+
+    const reason = args.slice(2).join(' ');
+
+    try {
+      const success = await updateTemplateStatus(id, status as any, reason);
+      if (success) {
+        printSuccess(`Template status updated to: ${status}`);
+      } else {
+        printError('Failed to update status');
+      }
+    } catch (error) {
+      printError(`Failed to update status: ${(error as Error).message}`);
+    }
+  }
+
+  private async practiceDelete(args: string[]): Promise<void> {
+    const id = args[0];
+    if (!id) {
+      printError('Template ID is required. Usage: practice delete <id>');
+      return;
+    }
+
+    try {
+      const success = await deleteTemplate(id);
+      if (success) {
+        printSuccess('Template deleted');
+      } else {
+        printError('Template not found');
+      }
+    } catch (error) {
+      printError(`Failed to delete: ${(error as Error).message}`);
+    }
+  }
+
+  private async practiceStart(args: string[]): Promise<void> {
+    const templateId = args[0];
+    if (!templateId) {
+      printError('Template ID is required. Usage: practice start <templateId>');
+      return;
+    }
+
+    try {
+      const groupId = await createPracticeGroup(templateId);
+      printSuccess(`Practice group created: ${groupId}`);
+      console.log(`  Use this group ID for scenario generation and reflection`);
+    } catch (error) {
+      printError(`Failed to start practice: ${(error as Error).message}`);
+    }
+  }
+
+  private async practiceScenario(args: string[]): Promise<void> {
+    const templateId = args[0];
+    const difficulty = args[1] ? parseInt(args[1], 10) : 3;
+    const complexity = args[2]?.toLowerCase() === 'complex'
+      ? ProblemComplexity.Complex
+      : ProblemComplexity.Simple;
+
+    if (!templateId) {
+      printError('Template ID is required. Usage: practice scenario <templateId> [difficulty] [complexity]');
+      return;
+    }
+
+    try {
+      const scenario = await generateScenario(templateId, difficulty, complexity);
+      console.log();
+      console.log('  \x1b[36mGenerated Scenario:\x1b[0m');
+      console.log();
+      console.log(`  \x1b[33mTitle:\x1b[0m ${scenario.title}`);
+      console.log(`  \x1b[33mDescription:\x1b[0m ${scenario.description}`);
+      console.log(`  \x1b[33mComplexity:\x1b[0m ${scenario.complexity}`);
+      if (scenario.suggestedApproach) {
+        console.log(`  \x1b[33mSuggested Approach:\x1b[0m ${scenario.suggestedApproach}`);
+      }
+      console.log();
+    } catch (error) {
+      printError(`Failed to generate scenario: ${(error as Error).message}`);
+    }
+  }
+
+  private async practiceReflect(args: string[]): Promise<void> {
+    const groupId = args[0];
+    const feedback = args.slice(1).join(' ');
+
+    if (!groupId) {
+      printError('Group ID is required. Usage: practice reflect <groupId> [feedback]');
+      return;
+    }
+
+    try {
+      const result = await generateReflection(groupId, feedback || undefined);
+      console.log();
+      console.log('  \x1b[36mReflection:\x1b[0m');
+      console.log();
+      console.log(`  \x1b[33mFocus:\x1b[0m ${result.reflection.focusContradiction}`);
+      console.log(`  \x1b[33mStatus:\x1b[0m ${result.reflection.status}`);
+      console.log();
+      if (result.workflowChanges.length > 0) {
+        console.log('  \x1b[33mWorkflow Changes:\x1b[0m');
+        result.workflowChanges.forEach((c: any) => {
+          console.log(`    - [${c.changeType}] ${c.content} (${c.priority})`);
+        });
+        console.log();
+      }
+    } catch (error) {
+      printError(`Failed to generate reflection: ${(error as Error).message}`);
+    }
+  }
+
+  private async practiceRecognize(args: string[]): Promise<void> {
+    const input = args.join(' ');
+    if (!input) {
+      printError('Input is required. Usage: practice recognize <your input>');
+      return;
+    }
+
+    try {
+      const result = await recognizeIntent(input);
+      console.log();
+
+      if (result.template) {
+        console.log(`  \x1b[36mMatched Template:\x1b[0m ${result.template.name}`);
+        console.log(`  \x1b[33mConfidence:\x1b[0m ${(result.score * 100).toFixed(1)}%`);
+        console.log(`  \x1b[33mLevel:\x1b[0m ${result.template.level}`);
+        console.log(`  \x1b[33mStatus:\x1b[0m ${result.template.status}`);
+      } else {
+        console.log('  \x1b[33mNo matching template found.\x1b[0m');
+      }
+
+      if (result.triggeredTraps && result.triggeredTraps.length > 0) {
+        console.log();
+        console.log('  \x1b[31mTriggered Traps:\x1b[0m');
+        result.triggeredTraps.forEach((t) => console.log(`    - ${t}`));
+      }
+
+      console.log();
+    } catch (error) {
+      printError(`Recognition failed: ${(error as Error).message}`);
     }
   }
 

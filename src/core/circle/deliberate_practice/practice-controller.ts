@@ -16,9 +16,9 @@ import type {
   ProcessLog,
   PracticeResult,
   VShapeMethod,
-} from '../../types/template.js';
+} from '../../../types/template.js';
 
-import { PracticeLevel, ProblemComplexity } from '../../types/template.js';
+import { PracticeLevel, ProblemComplexity } from '../../../types/template.js';
 
 export interface PracticeGroupConfig {
   /** 每组练习数量（默认 3） */

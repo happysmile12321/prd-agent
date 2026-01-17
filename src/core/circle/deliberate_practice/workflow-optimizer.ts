@@ -12,7 +12,7 @@ import type {
   WorkflowIteration,
   ValidationResult,
   PracticeTemplate,
-} from '../../types/template.js';
+} from '../../../types/template.js';
 
 export interface OptimizationRequest {
   /** 模板 ID */
