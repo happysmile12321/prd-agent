@@ -9,15 +9,18 @@
  * 5. 工作流优化 - 自动迭代工作流
  */
 
+import { TemplateEngine } from './template-engine.js';
+import { IntentRecognizer, type RecognitionResult, type RecognitionOptions } from './intent-recognizer.js';
+import { PracticeController, type PracticeGroupConfig } from './practice-controller.js';
+import { ReflectionEngine, type ReflectionInput, type ReflectionOutput } from './reflection-engine.js';
+import { WorkflowOptimizer, type OptimizationRequest, type OptimizationResult } from './workflow-optimizer.js';
+
 // 类型导出
 export * from '../../types/template.js';
 
 // 核心类导出
-export { TemplateEngine } from './template-engine.js';
-export { IntentRecognizer, type RecognitionResult, type RecognitionOptions } from './intent-recognizer.js';
-export { PracticeController, type PracticeGroupConfig } from './practice-controller.js';
-export { ReflectionEngine, type ReflectionInput, type ReflectionOutput } from './reflection-engine.js';
-export { WorkflowOptimizer, type OptimizationRequest, type OptimizationResult } from './workflow-optimizer.js';
+export { TemplateEngine, IntentRecognizer, PracticeController, ReflectionEngine, WorkflowOptimizer };
+export type { RecognitionResult, RecognitionOptions, PracticeGroupConfig, ReflectionInput, ReflectionOutput, OptimizationRequest, OptimizationResult };
 
 /**
  * 刻意练习系统入口
