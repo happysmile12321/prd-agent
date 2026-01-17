@@ -1,7 +1,7 @@
 {
   "name": "prd-agent",
   "version": "0.1.0",
-  "description": "A TUI task management tool inspired by lazygit",
+  "description": "A CLI task management tool",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -13,21 +13,17 @@
     "start": "node dist/cli.js",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["tui", "task", "management", "terminal"],
+  "keywords": ["cli", "task", "management", "terminal"],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "ink": "^4.4.1",
-    "react": "^18.2.0",
-    "ink-text-input": "^5.0.1",
-    "ink-use-stdout-dimensions": "^1.0.5",
-    "ink-select-input": "^5.0.0",
-    "chalk": "^5.3.0",
-    "figures": "^6.0.1"
+    "commander": "^12.0.0",
+    "inquirer": "^9.2.0",
+    "chalk": "^5.3.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
-    "@types/react": "^18.2.0",
+    "@types/inquirer": "^9.0.0",
     "tsup": "^8.0.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.0"
