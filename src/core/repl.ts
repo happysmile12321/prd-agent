@@ -22,6 +22,7 @@ import {
   PracticeLevel,
   ProblemComplexity,
 } from './circle/deliberate_practice/index.js';
+import { getAgent, listAgents, createAgent } from './circle/agent/index.js';
 
 // 命令类型
 interface Command {
@@ -177,6 +178,14 @@ export class REPL {
       aliases: ['pr', 'dp'],
       description: 'Deliberate Practice module. Usage: practice <command> [args]',
       handler: async (args) => this.cmdPractice(args),
+    });
+
+    // Agent 模块
+    this.register({
+      name: 'agent',
+      aliases: ['ag'],
+      description: 'AI Agent module. Usage: agent <command> [args]',
+      handler: async (args) => this.cmdAgent(args),
     });
 
     // 配置
@@ -1073,6 +1082,256 @@ export class REPL {
     }
   }
 
+  // Agent 模块命令处理
+  private async cmdAgent(args: string[]): Promise<void> {
+    const subCommand = args[0]?.toLowerCase();
+
+    if (!subCommand) {
+      this.showAgentHelp();
+      return;
+    }
+
+    switch (subCommand) {
+      case 'perceive':
+      case 'perc':
+        await this.agentPerceive(args.slice(1));
+        break;
+      case 'decide':
+      case 'dec':
+        await this.agentDecide(args.slice(1));
+        break;
+      case 'act':
+        await this.agentAct(args.slice(1));
+        break;
+      case 'run':
+        await this.agentRun(args.slice(1));
+        break;
+      case 'status':
+      case 'state':
+        await this.agentStatus(args.slice(1));
+        break;
+      case 'history':
+      case 'hist':
+        await this.agentHistory(args.slice(1));
+        break;
+      case 'reset':
+        await this.agentReset(args.slice(1));
+        break;
+      case 'list':
+      case 'ls':
+        await this.agentList();
+        break;
+      case 'new':
+      case 'create':
+        await this.agentCreate(args.slice(1));
+        break;
+      default:
+        printError(`Unknown agent command: ${subCommand}`);
+        this.showAgentHelp();
+    }
+  }
+
+  private showAgentHelp(): void {
+    console.log();
+    console.log('  \x1b[36mAI Agent (Perceive-Decide-Act):\x1b[0m');
+    console.log();
+    console.log('  \x1b[33mPDA Cycle:\x1b[0m');
+    console.log('    perceive <context>      Perceive environment');
+    console.log('    decide                  Make decision based on perception');
+    console.log('    act                     Execute action');
+    console.log('    run <context>           Full PDA cycle');
+    console.log();
+    console.log('  \x1b[33mManagement:\x1b[0m');
+    console.log('    status [name]           Show agent status');
+    console.log('    history [name]          Show agent history');
+    console.log('    reset [name]            Reset agent state');
+    console.log('    list                    List all agents');
+    console.log('    new <name>              Create new agent');
+    console.log();
+  }
+
+  private getAgentName(args: string[]): string {
+    const nameFlag = args.indexOf('--name');
+    return nameFlag >= 0 && args[nameFlag + 1] ? args[nameFlag + 1] : 'default';
+  }
+
+  private async agentPerceive(args: string[]): Promise<void> {
+    const context = args.filter((a) => !a.startsWith('--')).join(' ');
+    if (!context) {
+      printError('Context is required. Usage: agent perceive <context> [--name agent]');
+      return;
+    }
+
+    try {
+      const name = this.getAgentName(args);
+      const agent = getAgent(name);
+      const perception = await agent.perceive(context);
+
+      console.log();
+      console.log('  \x1b[36mPerception:\x1b[0m');
+      console.log(`    Context: ${perception.context}`);
+      console.log(`    Intent: ${perception.userIntent || 'N/A'}`);
+      console.log(`    Triggers: ${perception.triggers.join(', ') || 'None'}`);
+      console.log();
+      printSuccess('Perception complete');
+    } catch (error) {
+      printError(`Perception failed: ${(error as Error).message}`);
+    }
+  }
+
+  private async agentDecide(args: string[]): Promise<void> {
+    try {
+      const name = this.getAgentName(args);
+      const agent = getAgent(name);
+      const decision = await agent.decide();
+
+      console.log();
+      console.log('  \x1b[36mDecision:\x1b[0m');
+      console.log(`    Action: ${decision.action}`);
+      console.log(`    Reasoning: ${decision.reasoning}`);
+      console.log(`    Confidence: ${(decision.confidence * 100).toFixed(0)}%`);
+      console.log();
+      printSuccess('Decision made');
+    } catch (error) {
+      printError(`Decision failed: ${(error as Error).message}`);
+    }
+  }
+
+  private async agentAct(args: string[]): Promise<void> {
+    try {
+      const name = this.getAgentName(args);
+      const agent = getAgent(name);
+      const result = await agent.act();
+
+      console.log();
+      console.log('  \x1b[36mAction Result:\x1b[0m');
+      console.log(`    ${result.success ? '✓' : '✗'} ${result.action}`);
+      console.log(`    Result: ${result.result}`);
+      console.log(`    Feedback: ${result.feedback}`);
+      console.log();
+      printSuccess('Action executed');
+    } catch (error) {
+      printError(`Action failed: ${(error as Error).message}`);
+    }
+  }
+
+  private async agentRun(args: string[]): Promise<void> {
+    const context = args.filter((a) => !a.startsWith('--')).join(' ');
+    if (!context) {
+      printError('Context is required. Usage: agent run <context> [--name agent]');
+      return;
+    }
+
+    try {
+      const name = this.getAgentName(args);
+      const agent = getAgent(name);
+      const result = await agent.run(context);
+
+      console.log();
+      console.log('  \x1b[36mAgent Cycle Complete:\x1b[0m');
+      console.log(`    Action: ${result.action}`);
+      console.log(`    Result: ${result.result}`);
+      console.log(`    Next State: ${result.nextState}`);
+      console.log();
+      printSuccess('Cycle complete');
+    } catch (error) {
+      printError(`Run failed: ${(error as Error).message}`);
+    }
+  }
+
+  private async agentStatus(args: string[]): Promise<void> {
+    const name = args[0] || 'default';
+    try {
+      const agent = getAgent(name);
+      console.log(agent.formatHistory());
+    } catch (error) {
+      printError(`Failed to get status: ${(error as Error).message}`);
+    }
+  }
+
+  private async agentHistory(args: string[]): Promise<void> {
+    const name = args[0] || 'default';
+    try {
+      const agent = getAgent(name);
+      const history = agent.getHistory();
+
+      console.log();
+      console.log('  \x1b[36mAgent History:\x1b[0m');
+      console.log();
+
+      if (history.perceptions.length === 0) {
+        console.log('  No history yet.');
+        console.log();
+        return;
+      }
+
+      console.log('  \x1b[33mPerceptions:\x1b[0m');
+      history.perceptions.forEach((p, i) => {
+        console.log(`    ${i + 1}. ${new Date(p.timestamp).toLocaleTimeString()} - ${p.context.slice(0, 40)}...`);
+      });
+
+      console.log();
+      console.log('  \x1b[33mDecisions:\x1b[0m');
+      history.decisions.forEach((d, i) => {
+        console.log(`    ${i + 1}. ${new Date(d.timestamp).toLocaleTimeString()} - ${d.action} (${(d.confidence * 100).toFixed(0)}%)`);
+      });
+
+      console.log();
+      console.log('  \x1b[33mActions:\x1b[0m');
+      history.actions.forEach((a, i) => {
+        console.log(`    ${i + 1}. ${new Date(a.timestamp).toLocaleTimeString()} - ${a.success ? '✓' : '✗'} ${a.action}`);
+      });
+
+      console.log();
+    } catch (error) {
+      printError(`Failed to get history: ${(error as Error).message}`);
+    }
+  }
+
+  private async agentReset(args: string[]): Promise<void> {
+    const name = args[0] || 'default';
+    try {
+      const agent = getAgent(name);
+      agent.reset();
+      printSuccess(`Agent '${name}' reset`);
+    } catch (error) {
+      printError(`Failed to reset: ${(error as Error).message}`);
+    }
+  }
+
+  private async agentList(): Promise<void> {
+    const agents = listAgents();
+    console.log();
+    console.log('  \x1b[36mActive Agents:\x1b[0m');
+    console.log();
+
+    if (agents.length === 0) {
+      console.log('  No agents yet.');
+      console.log();
+      return;
+    }
+
+    agents.forEach((name) => {
+      console.log(`    • ${name}`);
+    });
+    console.log();
+  }
+
+  private async agentCreate(args: string[]): Promise<void> {
+    const name = args[0];
+    if (!name) {
+      printError('Name is required. Usage: agent new <name>');
+      return;
+    }
+
+    try {
+      createAgent(name);
+      printSuccess(`Agent '${name}' created`);
+    } catch (error) {
+      printError(`Failed to create: ${(error as Error).message}`);
+    }
+  }
+
   private async cmdHelp(): Promise<void> {
     console.log();
     console.log('\x1b[33m  Available Commands:\x1b[0m');
@@ -1082,6 +1341,14 @@ export class REPL {
       {
         name: 'SPR Learning',
         commands: ['spr'],
+      },
+      {
+        name: 'Deliberate Practice',
+        commands: ['practice', 'pr', 'dp'],
+      },
+      {
+        name: 'AI Agent',
+        commands: ['agent', 'ag'],
       },
       {
         name: 'AI Chat',
