@@ -305,7 +305,10 @@ export class Screen {
       this.render();
     });
 
-    // 渲染
+    // 首次渲染屏幕（让元素计算布局）
+    this.screen.render();
+
+    // 然后渲染内容
     this.render();
   }
 
