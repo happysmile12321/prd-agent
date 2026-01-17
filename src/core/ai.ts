@@ -1,7 +1,7 @@
-import { getApiKey, getApiUrl } from './config.js';
+import { getApiKey, getApiUrl, saveConfig } from './config.js';
 
-// 智谱AI 消息类型
-interface ChatMessage {
+// 聊天消息
+export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
@@ -16,12 +16,15 @@ export interface AIResponse {
   };
 }
 
+// 聊天历史
+let chatHistory: ChatMessage[] = [];
+
 // 调用智谱AI API
 export async function callAI(messages: ChatMessage[], model = 'glm-4-flash'): Promise<AIResponse> {
   const apiKey = await getApiKey();
 
   if (!apiKey) {
-    throw new Error('API key not configured. Run: prd config set-api <your-key>');
+    throw new Error('API key not configured. Run: set-api <your-key>');
   }
 
   const response = await fetch(getApiUrl(), {
@@ -52,98 +55,99 @@ export async function callAI(messages: ChatMessage[], model = 'glm-4-flash'): Pr
   };
 }
 
-// 生成任务
-export async function generateTasks(prompt: string): Promise<string[]> {
-  const messages: ChatMessage[] = [
-    {
-      role: 'system',
-      content: `你是一个任务管理助手。用户会描述他们需要做的事情，你需要将其拆分成具体的任务。
-
-要求：
-1. 每个任务简洁明了，用一句话描述
-2. 按优先级排序（重要/紧急的在前）
-3. 每行一个任务，格式：- [任务描述]
-4. 只返回任务列表，不要其他内容`,
-    },
-    {
-      role: 'user',
-      content: prompt,
-    },
-  ];
-
-  const response = await callAI(messages);
-  const tasks = response.content
-    .split('\n')
-    .map((line) => line.replace(/^[-*•]\s*/, '').trim())
-    .filter((line) => line.length > 0);
-
-  return tasks;
+// 清空聊天历史
+export function clearHistory(): void {
+  chatHistory = [];
 }
 
-// 分析任务
-export async function analyzeTask(title: string, description?: string): Promise<string> {
-  const messages: ChatMessage[] = [
-    {
-      role: 'system',
-      content: `你是一个任务分析助手。分析用户给出的任务，提供：
+// 获取聊天历史
+export function getHistory(): ChatMessage[] {
+  return chatHistory;
+}
 
-1. 任务评估（复杂度、预估时间）
-2. 拆分建议（如何将大任务拆解）
-3. 风险点提示
-4. 相关建议
+// 添加到历史
+export function addToHistory(message: ChatMessage): void {
+  chatHistory.push(message);
+  // 限制历史长度
+  if (chatHistory.length > 50) {
+    chatHistory = chatHistory.slice(-20);
+  }
+}
 
-用简洁的中文回复，分段清晰。`,
-    },
-    {
-      role: 'user',
-      content: `任务：${title}\n${description ? `描述：${description}` : ''}`,
-    },
-  ];
+// 对话模式 - 持续对话
+export async function chat(userMessage: string, systemPrompt?: string): Promise<string> {
+  const messages: ChatMessage[] = [];
+
+  if (systemPrompt) {
+    messages.push({ role: 'system', content: systemPrompt });
+  }
+
+  // 添加历史消息
+  messages.push(...chatHistory);
+
+  // 添加当前用户消息
+  messages.push({ role: 'user', content: userMessage });
+
+  const response = await callAI(messages);
+
+  // 保存到历史
+  addToHistory({ role: 'user', content: userMessage });
+  addToHistory({ role: 'assistant', content: response.content });
+
+  return response.content;
+}
+
+// 一次性提问（不保存历史）
+export async function ask(userMessage: string, systemPrompt?: string): Promise<string> {
+  const messages: ChatMessage[] = [];
+
+  if (systemPrompt) {
+    messages.push({ role: 'system', content: systemPrompt });
+  }
+
+  messages.push({ role: 'user', content: userMessage });
 
   const response = await callAI(messages);
   return response.content;
 }
 
-// 智能补全
-export async function autoComplete(partial: string): Promise<string> {
-  const messages: ChatMessage[] = [
-    {
-      role: 'system',
-      content: `你是任务管理助手。根据用户输入的部分内容，智能补全任务标题或描述。
+// 代码生成
+export async function generateCode(prompt: string, language?: string): Promise<string> {
+  const systemPrompt = language
+    ? `你是一个${language}编程专家。根据用户需求生成代码。只返回代码，不要其他说明。`
+    : `你是一个编程专家。根据用户需求生成代码，只返回代码，不要其他说明。`;
 
-只返回补全后的完整内容，不要其他解释。`,
-    },
-    {
-      role: 'user',
-      content: `补全这个任务：${partial}`,
-    },
-  ];
-
-  const response = await callAI(messages, 'glm-4-flash');
-  return response.content.trim();
+  return ask(prompt, systemPrompt);
 }
 
-// 总结任务列表
-export async function summarizeTasks(tasks: Array<{ title: string; status: string }>): Promise<string> {
-  const taskList = tasks
-    .map((t, i) => `${i + 1}. [${t.status}] ${t.title}`)
-    .join('\n');
+// 代码审查
+export async function reviewCode(code: string, language?: string): Promise<string> {
+  const systemPrompt = language
+    ? `你是一个${language}代码审查专家。分析用户提交的代码，指出问题、给出改进建议。`
+    : `你是一个代码审查专家。分析用户提交的代码，指出问题、给出改进建议。`;
 
-  const messages: ChatMessage[] = [
-    {
-      role: 'system',
-      content: `你是任务管理助手。根据用户的任务列表，提供：
+  return ask(code, systemPrompt);
+}
 
-1. 整体进度评估
-2. 关键建议（下一步做什么、是否有遗漏等）
-3. 简洁明了，分段清晰`,
-    },
-    {
-      role: 'user',
-      content: `我的任务列表：\n${taskList}`,
-    },
-  ];
+// 代码解释
+export async function explainCode(code: string): Promise<string> {
+  return ask(code, '你是一个代码解释助手。请详细解释这段代码的功能、逻辑和实现方式。');
+}
 
-  const response = await callAI(messages);
-  return response.content;
+// 文本总结
+export async function summarizeText(text: string): Promise<string> {
+  return ask(text, '你是一个文本总结助手。请用简洁明了的语言总结以下内容的主要观点。');
+}
+
+// 文本润色
+export async function polishText(text: string): Promise<string> {
+  return ask(text, '你是一个文本润色助手。请优化以下文本，使其更加通顺、专业、易读。只返回润色后的文本。');
+}
+
+// 翻译
+export async function translateText(text: string, targetLanguage = 'English'): Promise<string> {
+  return ask(
+    text,
+    `你是一个专业翻译。将以下文本翻译成${targetLanguage}，保持原文的格式和结构。只返回翻译结果。`
+  );
 }

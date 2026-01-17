@@ -8,7 +8,7 @@
     "prd": "./dist/cli.js"
   },
   "scripts": {
-    "dev": "tsx watch src/cli.ts",
+    "dev": "tsx src/cli.ts",
     "start": "tsx src/cli.ts",
     "repl": "tsx src/cli.ts",
     "build": "tsup",

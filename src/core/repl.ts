@@ -1,10 +1,8 @@
 import { createInterface } from 'readline';
 import { stdin as input, stdout as output } from 'process';
-import { getTaskManager } from '../core/task-manager.js';
-import { setApiKey } from '../core/config.js';
-import { generateTasks, analyzeTask, summarizeTasks } from '../core/ai.js';
-import { printSuccess, printError, printInfo, printTaskList, printTaskDetail, printTags, printStats } from '../ui/printer.js';
-import { TaskStatus, TaskPriority } from '../types/task.js';
+import { setApiKey } from './config.js';
+import { chat, clearHistory, getHistory, ask, generateCode, reviewCode, explainCode, summarizeText, polishText, translateText } from './ai.js';
+import { printSuccess, printError, printInfo } from '../ui/printer.js';
 
 // 命令类型
 interface Command {
@@ -17,13 +15,10 @@ interface Command {
 // REPL 环境
 export class REPL {
   private rl: ReturnType<typeof createInterface>;
-  private manager: ReturnType<typeof getTaskManager>;
   private commands: Map<string, Command> = new Map();
-  private history: string[] = [];
   private running = true;
 
   constructor() {
-    this.manager = getTaskManager();
     this.setupCommands();
     this.rl = this.createInterface();
   }
@@ -46,21 +41,21 @@ export class REPL {
           return [matches, line];
         }
 
-        // 补全参数（状态）
-        if (['list', 'ls'].includes(command) && (parts.includes('-s') || parts.includes('--status'))) {
-          const statuses = ['todo', 'in-progress', 'done'];
+        // 补全编程语言
+        if (['code', 'review'].includes(command) && parts[1] === '-l' && parts.length === 3) {
+          const languages = ['javascript', 'typescript', 'python', 'java', 'go', 'rust', 'cpp', 'c'];
           const lastPart = parts[parts.length - 1];
-          const matches = statuses.filter((s) => s.startsWith(lastPart));
+          const matches = languages.filter((l) => l.startsWith(lastPart));
           if (matches.length > 0) {
             return [matches, line];
           }
         }
 
-        // 补全参数（优先级）
-        if (['list', 'ls', 'add'].includes(command) && (parts.includes('-p') || parts.includes('--priority'))) {
-          const priorities = ['low', 'medium', 'high', 'urgent'];
+        // 补全目标语言
+        if (['translate', 'trans'].includes(command) && parts[1] === '-t' && parts.length === 3) {
+          const languages = ['English', 'Chinese', 'Japanese', 'Korean', 'French', 'German', 'Spanish'];
           const lastPart = parts[parts.length - 1];
-          const matches = priorities.filter((p) => p.startsWith(lastPart));
+          const matches = languages.filter((l) => l.startsWith(lastPart));
           if (matches.length > 0) {
             return [matches, line];
           }
@@ -70,108 +65,90 @@ export class REPL {
       },
     });
 
-    rl.on('line', (line) => {
-      if (line.trim()) {
-        this.history.push(line.trim());
-      }
-    });
-
     return rl;
   }
 
   // 设置命令
   private setupCommands(): void {
-    // 任务管理
+    // AI 聊天
     this.register({
-      name: 'add',
-      aliases: ['a', 'new'],
-      description: 'Add a new task. Usage: add <title> [-p priority] [-t tags]',
-      handler: async (args) => this.cmdAdd(args),
+      name: 'ask',
+      aliases: ['a', 'chat'],
+      description: 'Ask AI a question (one-shot)',
+      handler: async (args) => this.cmdAsk(args),
     });
 
     this.register({
-      name: 'list',
-      aliases: ['ls', 'l'],
-      description: 'List tasks. Usage: list [--status| -s status] [--priority| -p priority] [--tag tag]',
-      handler: async (args) => this.cmdList(args),
-    });
-
-    this.register({
-      name: 'show',
-      aliases: ['s', 'info'],
-      description: 'Show task details. Usage: show <id>',
-      handler: async (args) => this.cmdShow(args),
-    });
-
-    this.register({
-      name: 'update',
-      aliases: ['edit', 'u', 'e'],
-      description: 'Update a task. Usage: update <id> [--title] [--status] [--priority] [--tags]',
-      handler: async (args) => this.cmdUpdate(args),
-    });
-
-    this.register({
-      name: 'delete',
-      aliases: ['rm', 'del', 'd'],
-      description: 'Delete a task. Usage: delete <id>',
-      handler: async (args) => this.cmdDelete(args),
-    });
-
-    this.register({
-      name: 'complete',
-      aliases: ['done', 'x', 'c'],
-      description: 'Mark task as complete. Usage: complete <id>',
-      handler: async (args) => this.cmdComplete(args),
-    });
-
-    this.register({
-      name: 'search',
-      aliases: ['?'],
-      description: 'Search tasks. Usage: search <query>',
-      handler: async (args) => this.cmdSearch(args),
-    });
-
-    this.register({
-      name: 'tags',
+      name: 'talk',
       aliases: ['t'],
-      description: 'List all tags',
-      handler: async () => this.cmdTags(),
+      description: 'Chat with AI (conversational)',
+      handler: async (args) => this.cmdTalk(args),
+    });
+
+    // 代码相关
+    this.register({
+      name: 'code',
+      aliases: ['gen'],
+      description: 'Generate code. Usage: code <prompt> [-l language]',
+      handler: async (args) => this.cmdCode(args),
     });
 
     this.register({
-      name: 'stats',
-      aliases: ['stat'],
-      description: 'Show statistics',
-      handler: async () => this.cmdStats(),
-    });
-
-    // AI 命令
-    this.register({
-      name: 'generate',
-      aliases: ['gen', 'ai-gen'],
-      description: 'AI generate tasks. Usage: generate <prompt>',
-      handler: async (args) => this.cmdGenerate(args),
+      name: 'review',
+      aliases: ['rev'],
+      description: 'Review code. Usage: review <code> [-l language]',
+      handler: async (args) => this.cmdReview(args),
     });
 
     this.register({
-      name: 'analyze',
-      aliases: ['ai', 'analyse'],
-      description: 'AI analyze a task. Usage: analyze <id>',
-      handler: async (args) => this.cmdAnalyze(args),
+      name: 'explain',
+      aliases: ['exp'],
+      description: 'Explain code. Usage: explain <code>',
+      handler: async (args) => this.cmdExplain(args),
     });
 
+    // 文本处理
     this.register({
-      name: 'summary',
+      name: 'summarize',
       aliases: ['sum'],
-      description: 'AI summarize your tasks',
-      handler: async () => this.cmdSummary(),
+      description: 'Summarize text. Usage: summarize <text>',
+      handler: async (args) => this.cmdSummarize(args),
+    });
+
+    this.register({
+      name: 'polish',
+      aliases: ['pol'],
+      description: 'Polish text. Usage: polish <text>',
+      handler: async (args) => this.cmdPolish(args),
+    });
+
+    this.register({
+      name: 'translate',
+      aliases: ['trans'],
+      description: 'Translate text. Usage: translate <text> [-t language]',
+      handler: async (args) => this.cmdTranslate(args),
+    });
+
+    // 历史管理
+    this.register({
+      name: 'history',
+      aliases: ['hist'],
+      description: 'Show chat history',
+      handler: async () => this.cmdHistory(),
+    });
+
+    this.register({
+      name: 'clear-history',
+      aliases: ['clear-hist'],
+      description: 'Clear chat history',
+      handler: async () => this.cmdClearHistory(),
     });
 
     // 配置
     this.register({
       name: 'set-api',
       aliases: ['config'],
-      description: 'Set API key. Usage: set-api <key>',
+      description: 'Set Zhipu AI API Key',
       handler: async (args) => this.cmdSetApi(args),
     });
 
@@ -208,7 +185,6 @@ export class REPL {
 
   // 启动 REPL
   async start(): Promise<void> {
-    // 显示欢迎信息
     this.printWelcome();
 
     // 主循环
@@ -217,7 +193,6 @@ export class REPL {
       const line = await this.readLine(prompt);
 
       if (line === null) {
-        // EOF (Ctrl+D)
         this.cmdExit();
         break;
       }
@@ -242,16 +217,16 @@ export class REPL {
 
   // 获取提示符
   private getPrompt(): string {
-    return '\x1b[36mprd>\x1b[0m ';
+    return '\x1b[36mAI>\x1b[0m ';
   }
 
   // 打印欢迎信息
   private printWelcome(): void {
     console.clear();
     console.log();
-    console.log('\x1b[36m╶┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╮');
-    console.log('\x1b[36m╎  \x1b[1mPRD Agent REPL\x1b[0m\x1b[36m                                      ╎');
-    console.log('\x1b[36m╶┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯\x1b[0m');
+    console.log('\x1b[36m╶┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╮');
+    console.log('\x1b[36m╎  \x1b[1mAI REPL\x1b[0m\x1b[36m - Powered by Zhipu AI                   ╎');
+    console.log('\x1b[36m╶┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯\x1b[0m');
     console.log();
     console.log('  Type \x1b[33mhelp\x1b[0m or \x1b[33m?\x1b[0m to see available commands.');
     console.log('  Type \x1b[33mexit\x1b[0m or \x1b[33mq\x1b[0m to leave.');
@@ -267,7 +242,8 @@ export class REPL {
     const command = this.commands.get(cmdName);
 
     if (!command) {
-      printError(`Unknown command: ${cmdName}. Type 'help' for available commands.`);
+      // 如果不是命令，直接当作 ask 命令处理
+      await this.cmdAsk(parts);
       return;
     }
 
@@ -280,375 +256,220 @@ export class REPL {
 
   // ===== 命令实现 =====
 
-  private async cmdAdd(args: string[]): Promise<void> {
-    let title = args[0];
-
-    // 解析选项
-    let priority: TaskPriority | undefined;
-    let tags: string[] | undefined;
-    let i = 0;
-
-    while (i < args.length) {
-      const arg = args[i];
-      if (arg === '-p' || arg === '--priority') {
-        const priorityMap: Record<string, TaskPriority> = {
-          low: TaskPriority.Low,
-          medium: TaskPriority.Medium,
-          high: TaskPriority.High,
-          urgent: TaskPriority.Urgent,
-        };
-        priority = priorityMap[args[i + 1]?.toLowerCase()];
-        i += 2;
-      } else if (arg === '-t' || arg === '--tags') {
-        tags = (args[i + 1] || '').split(',').map((t) => t.trim());
-        i += 2;
-      } else if (!title) {
-        title = arg;
-        i++;
-      } else {
-        i++;
-      }
-    }
-
-    if (!title) {
-      printError('Title is required. Usage: add <title> [-p priority] [-t tags]');
-      return;
-    }
-
-    const task = await this.manager.create({
-      title,
-      priority,
-      tags,
-    });
-
-    printSuccess(`Task created: [${task.id.slice(0, 8)}] ${task.title}`);
-  }
-
-  private async cmdList(args: string[]): Promise<void> {
-    const options: {
-      status?: TaskStatus;
-      priority?: TaskPriority;
-      tags?: string[];
-    } = {};
-
-    // 解析选项
-    for (let i = 0; i < args.length; i++) {
-      const arg = args[i];
-      if (arg === '-s' || arg === '--status') {
-        const statusMap: Record<string, TaskStatus> = {
-          todo: TaskStatus.Todo,
-          'in-progress': TaskStatus.InProgress,
-          progress: TaskStatus.InProgress,
-          done: TaskStatus.Done,
-        };
-        options.status = statusMap[args[i + 1]?.toLowerCase()];
-      } else if (arg === '-p' || arg === '--priority') {
-        const priorityMap: Record<string, TaskPriority> = {
-          low: TaskPriority.Low,
-          medium: TaskPriority.Medium,
-          high: TaskPriority.High,
-          urgent: TaskPriority.Urgent,
-        };
-        options.priority = priorityMap[args[i + 1]?.toLowerCase()];
-      } else if (arg === '--tag') {
-        options.tags = [args[i + 1] || ''];
-      }
-    }
-
-    const tasks = await this.manager.getAll(options);
-    printTaskList(tasks);
-
-    const stats = await this.manager.getStats();
-    printStats(stats);
-  }
-
-  private async cmdShow(args: string[]): Promise<void> {
-    const idOrIndex = args[0];
-    if (!idOrIndex) {
-      printError('Task ID or index is required. Usage: show <id>');
-      return;
-    }
-
-    const indexNum = parseInt(idOrIndex, 10);
-    let task;
-    let index: number;
-
-    if (!isNaN(indexNum)) {
-      task = await this.manager.getByIndex(indexNum);
-      index = indexNum;
-    } else {
-      task = await this.manager.getById(idOrIndex);
-      const allTasks = await this.manager.getAll();
-      index = allTasks.findIndex((t) => t.id === idOrIndex) + 1;
-    }
-
-    if (!task) {
-      printError(`Task not found: ${idOrIndex}`);
-      return;
-    }
-
-    printTaskDetail(task, index);
-  }
-
-  private async cmdUpdate(args: string[]): Promise<void> {
-    const idOrIndex = args[0];
-    if (!idOrIndex) {
-      printError('Task ID or index is required. Usage: update <id> [options]');
-      return;
-    }
-
-    // 查找任务
-    let task;
-    const indexNum = parseInt(idOrIndex, 10);
-    if (!isNaN(indexNum)) {
-      task = await this.manager.getByIndex(indexNum);
-    } else {
-      task = await this.manager.getById(idOrIndex);
-    }
-
-    if (!task) {
-      printError(`Task not found: ${idOrIndex}`);
-      return;
-    }
-
-    // 解析选项
-    const options: {
-      title?: string;
-      status?: TaskStatus;
-      priority?: TaskPriority;
-      tags?: string[];
-    } = {};
-
-    for (let i = 1; i < args.length; i++) {
-      const arg = args[i];
-      if (arg === '--title' && args[i + 1]) {
-        options.title = args[++i];
-      } else if (arg === '--status' && args[i + 1]) {
-        const statusMap: Record<string, TaskStatus> = {
-          todo: TaskStatus.Todo,
-          'in-progress': TaskStatus.InProgress,
-          progress: TaskStatus.InProgress,
-          done: TaskStatus.Done,
-        };
-        options.status = statusMap[args[++i]?.toLowerCase()];
-      } else if (arg === '--priority' && args[i + 1]) {
-        const priorityMap: Record<string, TaskPriority> = {
-          low: TaskPriority.Low,
-          medium: TaskPriority.Medium,
-          high: TaskPriority.High,
-          urgent: TaskPriority.Urgent,
-        };
-        options.priority = priorityMap[args[++i]?.toLowerCase()];
-      } else if (arg === '--tags' && args[i + 1]) {
-        options.tags = args[++i].split(',').map((t) => t.trim());
-      }
-    }
-
-    const updated = await this.manager.update(task.id, options);
-    if (updated) {
-      printSuccess(`Task updated: [${updated.id.slice(0, 8)}] ${updated.title}`);
-    } else {
-      printError('Failed to update task');
-    }
-  }
-
-  private async cmdDelete(args: string[]): Promise<void> {
-    const idOrIndex = args[0];
-    if (!idOrIndex) {
-      printError('Task ID or index is required. Usage: delete <id>');
-      return;
-    }
-
-    // 查找任务
-    let task;
-    const indexNum = parseInt(idOrIndex, 10);
-    if (!isNaN(indexNum)) {
-      task = await this.manager.getByIndex(indexNum);
-    } else {
-      task = await this.manager.getById(idOrIndex);
-    }
-
-    if (!task) {
-      printError(`Task not found: ${idOrIndex}`);
-      return;
-    }
-
-    const success = await this.manager.delete(task.id);
-    if (success) {
-      printSuccess(`Task deleted: ${task.title}`);
-    } else {
-      printError('Failed to delete task');
-    }
-  }
-
-  private async cmdComplete(args: string[]): Promise<void> {
-    const idOrIndex = args[0];
-    if (!idOrIndex) {
-      printError('Task ID or index is required. Usage: complete <id>');
-      return;
-    }
-
-    // 查找任务
-    let task;
-    const indexNum = parseInt(idOrIndex, 10);
-    if (!isNaN(indexNum)) {
-      task = await this.manager.getByIndex(indexNum);
-    } else {
-      task = await this.manager.getById(idOrIndex);
-    }
-
-    if (!task) {
-      printError(`Task not found: ${idOrIndex}`);
-      return;
-    }
-
-    const updated = await this.manager.toggleComplete(task.id);
-    if (updated) {
-      if (updated.status === TaskStatus.Done) {
-        printSuccess(`Task completed: ${updated.title}`);
-      } else {
-        printSuccess(`Task uncompleted: ${updated.title}`);
-      }
-    }
-  }
-
-  private async cmdSearch(args: string[]): Promise<void> {
-    const query = args.join(' ');
-    if (!query) {
-      printError('Search query is required. Usage: search <query>');
-      return;
-    }
-
-    const tasks = await this.manager.getAll({ search: query });
-    printTaskList(tasks);
-  }
-
-  private async cmdTags(): Promise<void> {
-    const tags = await this.manager.getTags();
-    printTags(tags);
-  }
-
-  private async cmdStats(): Promise<void> {
-    const stats = await this.manager.getStats();
-    printStats(stats);
-  }
-
-  private async cmdGenerate(args: string[]): Promise<void> {
+  private async cmdAsk(args: string[]): Promise<void> {
     const prompt = args.join(' ');
     if (!prompt) {
-      printError('Prompt is required. Usage: generate <prompt>');
+      printError('Prompt is required. Usage: ask <your question>');
       return;
     }
 
-    printInfo('AI generating tasks...');
+    printInfo('Thinking...');
 
     try {
-      const tasks = await generateTasks(prompt);
-
-      if (tasks.length === 0) {
-        printInfo('No tasks generated');
-        return;
-      }
-
+      const response = await ask(prompt);
       console.log();
-      console.log(`  Generated ${tasks.length} tasks:`);
-      console.log();
-
-      for (let i = 0; i < tasks.length; i++) {
-        console.log(`    ${i + 1}. ${tasks[i]}`);
-      }
-      console.log();
-
-      // 自动添加任务
-      for (const taskTitle of tasks) {
-        await this.manager.create({
-          title: taskTitle,
-          priority: TaskPriority.Medium,
-        });
-      }
-
-      printSuccess(`Added ${tasks.length} tasks`);
-    } catch (error) {
-      printError((error as Error).message);
-    }
-  }
-
-  private async cmdAnalyze(args: string[]): Promise<void> {
-    const idOrIndex = args[0];
-    if (!idOrIndex) {
-      printError('Task ID or index is required. Usage: analyze <id>');
-      return;
-    }
-
-    // 查找任务
-    let task;
-    let displayIndex: string;
-    const indexNum = parseInt(idOrIndex, 10);
-    if (!isNaN(indexNum)) {
-      task = await this.manager.getByIndex(indexNum);
-      displayIndex = String(indexNum);
-    } else {
-      task = await this.manager.getById(idOrIndex);
-      displayIndex = task?.id.slice(0, 8) || idOrIndex;
-    }
-
-    if (!task) {
-      printError(`Task not found: ${idOrIndex}`);
-      return;
-    }
-
-    printInfo('AI analyzing task...');
-
-    try {
-      const analysis = await analyzeTask(task.title, task.description);
-
-      console.log();
-      console.log('\x1b[36m  ╭─────────────────────────────────────────────────────╮\x1b[0m');
-      console.log('\x1b[36m  │  \x1b[1mAI Analysis for Task #' + displayIndex + '\x1b[0m\x1b[36m                           │\x1b[0m');
-      console.log('\x1b[36m  ╰─────────────────────────────────────────────────────╯\x1b[0m');
-      console.log();
-      console.log(`  \x1b[1m${task.title}\x1b[0m`);
-      console.log();
-
-      const lines = analysis.split('\n');
-      for (const line of lines) {
-        console.log(`  ${line}`);
-      }
+      console.log(`  \x1b[33m${response}\x1b[0m`);
       console.log();
     } catch (error) {
       printError((error as Error).message);
     }
   }
 
-  private async cmdSummary(): Promise<void> {
-    const tasks = await this.manager.getAll();
-
-    if (tasks.length === 0) {
-      printInfo('No tasks to summarize');
+  private async cmdTalk(args: string[]): Promise<void> {
+    const message = args.join(' ');
+    if (!message) {
+      // 进入对话模式
+      this.enterChatMode();
       return;
     }
 
-    printInfo('AI analyzing your tasks...');
+    printInfo('Thinking...');
 
     try {
-      const summary = await summarizeTasks(
-        tasks.map((t) => ({ title: t.title, status: t.status }))
-      );
-
+      const response = await chat(message);
       console.log();
-      console.log('\x1b[36m  ╭─────────────────────────────────────────────────────╮\x1b[0m');
-      console.log('\x1b[36m  │  \x1b[1mAI Summary\x1b[0m\x1b[36m                                              │\x1b[0m');
-      console.log('\x1b[36m  ╰─────────────────────────────────────────────────────╯\x1b[0m');
-      console.log();
-
-      const lines = summary.split('\n');
-      for (const line of lines) {
-        console.log(`  ${line}`);
-      }
+      console.log(`  \x1b[33m${response}\x1b[0m`);
       console.log();
     } catch (error) {
       printError((error as Error).message);
     }
+  }
+
+  private async cmdCode(args: string[]): Promise<void> {
+    let prompt = '';
+    let language: string | undefined;
+
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '-l' && args[i + 1]) {
+        language = args[++i];
+      } else if (!prompt) {
+        prompt = args[i];
+      } else {
+        prompt += ' ' + args[i];
+      }
+    }
+
+    if (!prompt) {
+      printError('Prompt is required. Usage: code <prompt> [-l language]');
+      return;
+    }
+
+    printInfo('Generating code...');
+
+    try {
+      const code = await generateCode(prompt, language);
+      console.log();
+      console.log('  \x1b[37m' + code + '\x1b[0m');
+      console.log();
+    } catch (error) {
+      printError((error as Error).message);
+    }
+  }
+
+  private async cmdReview(args: string[]): Promise<void> {
+    let code = '';
+    let language: string | undefined;
+
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '-l' && args[i + 1]) {
+        language = args[++i];
+      } else if (!code) {
+        code = args[i];
+      } else {
+        code += ' ' + args[i];
+      }
+    }
+
+    if (!code) {
+      printError('Code is required. Usage: review <code> [-l language]');
+      return;
+    }
+
+    printInfo('Reviewing code...');
+
+    try {
+      const review = await reviewCode(code, language);
+      console.log();
+      console.log('  ' + review.split('\n').join('\n  '));
+      console.log();
+    } catch (error) {
+      printError((error as Error).message);
+    }
+  }
+
+  private async cmdExplain(args: string[]): Promise<void> {
+    const code = args.join(' ');
+    if (!code) {
+      printError('Code is required. Usage: explain <code>');
+      return;
+    }
+
+    printInfo('Explaining code...');
+
+    try {
+      const explanation = await explainCode(code);
+      console.log();
+      console.log('  ' + explanation.split('\n').join('\n  '));
+      console.log();
+    } catch (error) {
+      printError((error as Error).message);
+    }
+  }
+
+  private async cmdSummarize(args: string[]): Promise<void> {
+    const text = args.join(' ');
+    if (!text) {
+      printError('Text is required. Usage: summarize <text>');
+      return;
+    }
+
+    printInfo('Summarizing...');
+
+    try {
+      const summary = await summarizeText(text);
+      console.log();
+      console.log('  ' + summary.split('\n').join('\n  '));
+      console.log();
+    } catch (error) {
+      printError((error as Error).message);
+    }
+  }
+
+  private async cmdPolish(args: string[]): Promise<void> {
+    const text = args.join(' ');
+    if (!text) {
+      printError('Text is required. Usage: polish <text>');
+      return;
+    }
+
+    printInfo('Polishing...');
+
+    try {
+      const polished = await polishText(text);
+      console.log();
+      console.log('  ' + polished);
+      console.log();
+    } catch (error) {
+      printError((error as Error).message);
+    }
+  }
+
+  private async cmdTranslate(args: string[]): Promise<void> {
+    let text = '';
+    let targetLanguage = 'English';
+
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '-t' && args[i + 1]) {
+        targetLanguage = args[++i];
+      } else if (!text) {
+        text = args[i];
+      } else {
+        text += ' ' + args[i];
+      }
+    }
+
+    if (!text) {
+      printError('Text is required. Usage: translate <text> [-t language]');
+      return;
+    }
+
+    printInfo(`Translating to ${targetLanguage}...`);
+
+    try {
+      const translated = await translateText(text, targetLanguage);
+      console.log();
+      console.log('  ' + translated);
+      console.log();
+    } catch (error) {
+      printError((error as Error).message);
+    }
+  }
+
+  private async cmdHistory(): Promise<void> {
+    const history = getHistory();
+
+    if (history.length === 0) {
+      printInfo('No conversation history yet.');
+      return;
+    }
+
+    console.log();
+    console.log('  \x1b[36mConversation History:\x1b[0m');
+    console.log();
+
+    for (let i = 0; i < history.length; i++) {
+      const msg = history[i];
+      const role = msg.role === 'user' ? '\x1b[33mYou\x1b[0m' : '\x1b[36mAI\x1b[0m';
+      const prefix = i === 0 ? '' : '  ';
+      console.log(`${prefix} ${role}: ${msg.content.slice(0, 100)}${msg.content.length > 100 ? '...' : ''}`);
+    }
+
+    console.log();
+  }
+
+  private async cmdClearHistory(): Promise<void> {
+    clearHistory();
+    printSuccess('Conversation history cleared');
   }
 
   private async cmdSetApi(args: string[]): Promise<void> {
@@ -662,28 +483,35 @@ export class REPL {
     printSuccess('API key saved');
   }
 
-  private cmdHelp(): void {
+  private async cmdHelp(): void {
     console.log();
     console.log('\x1b[33m  Available Commands:\x1b[0m');
     console.log();
 
-    // 按类别分组
     const groups = [
       {
-        name: 'Task Management',
-        commands: ['add', 'list', 'show', 'update', 'delete', 'complete'],
+        name: 'AI Chat',
+        commands: ['ask', 'talk'],
       },
       {
-        name: 'Search & Info',
-        commands: ['search', 'tags', 'stats'],
+        name: 'Code',
+        commands: ['code', 'review', 'explain'],
       },
       {
-        name: 'AI Features',
-        commands: ['generate', 'analyze', 'summary'],
+        name: 'Text Processing',
+        commands: ['summarize', 'polish', 'translate'],
+      },
+      {
+        name: 'History',
+        commands: ['history', 'clear-history'],
+      },
+      {
+        name: 'Config',
+        commands: ['set-api'],
       },
       {
         name: 'System',
-        commands: ['set-api', 'help', 'clear', 'exit'],
+        commands: ['help', 'clear', 'exit'],
       },
     ];
 
@@ -692,8 +520,8 @@ export class REPL {
       for (const cmdName of group.commands) {
         const cmd = this.commands.get(cmdName);
         if (cmd) {
-          const aliases = cmd.aliases.length > 0
-            ? ` (${cmd.aliases.filter((a) => a !== cmdName).join(', ')})`
+          const aliases = cmd.aliases.length > 0 && cmd.aliases[0] !== cmdName
+            ? ` (${cmd.aliases.slice(0, 2).join(', ')})`
             : '';
           console.log(`    \x1b[33m${cmdName}\x1b[0m${aliases} - ${cmd.description}`);
         }
@@ -712,5 +540,44 @@ export class REPL {
     console.log('  Goodbye! 👋');
     console.log();
     this.running = false;
+  }
+
+  // 对话模式
+  private async enterChatMode(): Promise<void> {
+    console.log();
+    console.log('  \x1b[36mEntering chat mode...\x1b[0m');
+    console.log('  Type \x1b[33mexit\x1b[0m or \x1b[33mq\x1b[0m to leave chat mode.');
+    console.log();
+
+    while (this.running) {
+      const prompt = '\x1b[35mchat>\x1b[0m ';
+      const line = await this.readLine(prompt);
+
+      if (line === null) {
+        break;
+      }
+
+      const trimmed = line.trim();
+      if (!trimmed) {
+        continue;
+      }
+
+      if (trimmed === 'exit' || trimmed === 'q') {
+        break;
+      }
+
+      printInfo('Thinking...');
+
+      try {
+        const response = await chat(trimmed);
+        console.log();
+        console.log(`  \x1b[33m${response}\x1b[0m`);
+        console.log();
+      } catch (error) {
+        printError((error as Error).message);
+      }
+    }
+
+    printInfo('Exiting chat mode.');
   }
 }
