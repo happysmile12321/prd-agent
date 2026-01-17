@@ -3,6 +3,7 @@ import { stdin as input, stdout as output } from 'process';
 import { setApiKey } from './config.js';
 import { chat, clearHistory, getHistory, ask, generateCode, reviewCode, explainCode, summarizeText, polishText, translateText } from './ai.js';
 import { printSuccess, printError, printInfo } from '../ui/printer.js';
+import { initDB, analyzeMarkdown, generateSummary, generateQuizQuestions, evaluateAnswer, getAllTasks, getNotes, getQuizResults } from './circle/spr/index.js';
 
 // 命令类型
 interface Command {
@@ -142,6 +143,14 @@ export class REPL {
       aliases: ['clear-hist'],
       description: 'Clear chat history',
       handler: async () => this.cmdClearHistory(),
+    });
+
+    // SPR 模块
+    this.register({
+      name: 'spr',
+      aliases: [],
+      description: 'SPR learning module. Usage: spr <command> [args]',
+      handler: async (args) => this.cmdSpr(args),
     });
 
     // 配置
@@ -483,12 +492,248 @@ export class REPL {
     printSuccess('API key saved');
   }
 
-  private async cmdHelp(): void {
+  // SPR 模块命令处理
+  private async cmdSpr(args: string[]): Promise<void> {
+    const subCommand = args[0]?.toLowerCase();
+
+    if (!subCommand) {
+      this.showSprHelp();
+      return;
+    }
+
+    // 初始化数据库
+    await initDB();
+
+    switch (subCommand) {
+      case 'analyze':
+      case 'ana':
+        await this.sprAnalyze(args.slice(1));
+        break;
+      case 'summary':
+      case 'sum':
+        await this.sprSummary(args.slice(1));
+        break;
+      case 'quiz':
+        await this.sprQuiz(args.slice(1));
+        break;
+      case 'tasks':
+        await this.sprTasks();
+        break;
+      case 'notes':
+        await this.sprNotes();
+        break;
+      case 'results':
+        await this.sprResults(args.slice(1));
+        break;
+      case 'evaluate':
+      case 'eval':
+        await this.sprEvaluate(args.slice(1));
+        break;
+      default:
+        printError(`Unknown SPR command: ${subCommand}`);
+        this.showSprHelp();
+    }
+  }
+
+  private showSprHelp(): void {
+    console.log();
+    console.log('  \x1b[36mSPR (Structured Progressive Release) Module:\x1b[0m');
+    console.log();
+    console.log('  \x1b[33mCommands:\x1b[0m');
+    console.log('    analyze <file>     Analyze Markdown file and extract skeleton');
+    console.log('    summary <taskId>   Generate mind map and summary');
+    console.log('    quiz [id] [count]  Generate quiz questions (default: 5)');
+    console.log('    evaluate <quizId>  Evaluate answer for a quiz');
+    console.log('    tasks              List all tasks');
+    console.log('    notes              List all notes');
+    console.log('    results [quizId]   Show quiz results');
+    console.log();
+  }
+
+  private async sprAnalyze(args: string[]): Promise<void> {
+    const filePath = args[0];
+    if (!filePath) {
+      printError('File path is required. Usage: spr analyze <file>');
+      return;
+    }
+
+    try {
+      const taskId = await analyzeMarkdown(filePath);
+      printSuccess(`Task created with ID: ${taskId}`);
+    } catch (error) {
+      printError(`Failed to analyze: ${(error as Error).message}`);
+    }
+  }
+
+  private async sprSummary(args: string[]): Promise<void> {
+    const taskIdStr = args[0];
+    if (!taskIdStr) {
+      printError('Task ID is required. Usage: spr summary <taskId>');
+      return;
+    }
+
+    const taskId = parseInt(taskIdStr, 10);
+    if (isNaN(taskId)) {
+      printError('Invalid task ID');
+      return;
+    }
+
+    try {
+      const result = await generateSummary(taskId);
+      console.log();
+      console.log('  \x1b[36mTitle:\x1b[0m', result.title);
+      console.log();
+      console.log('  \x1b[36mKey Points:\x1b[0m');
+      result.keyPoints.forEach((point, i) => {
+        console.log(`    ${i + 1}. ${point}`);
+      });
+      console.log();
+      printSuccess('Summary generated');
+    } catch (error) {
+      printError(`Failed to generate summary: ${(error as Error).message}`);
+    }
+  }
+
+  private async sprQuiz(args: string[]): Promise<void> {
+    const skeletonId = args[0] ? parseInt(args[0], 10) : undefined;
+    const count = args[1] ? parseInt(args[1], 10) : 5;
+
+    try {
+      const questions = await generateQuizQuestions(skeletonId, count);
+      console.log();
+      console.log('  \x1b[36mQuiz Questions:\x1b[0m');
+      console.log();
+      questions.forEach((q, i) => {
+        console.log(`  \x1b[33m${i + 1}. [${q.type}] ${q.question}\x1b[0m`);
+        console.log(`     Difficulty: ${'★'.repeat(q.difficulty)}${'☆'.repeat(5 - q.difficulty)}`);
+        console.log(`     Hints: ${q.hints.join(', ') || 'None'}`);
+        console.log();
+      });
+      printSuccess(`${questions.length} questions generated`);
+    } catch (error) {
+      printError(`Failed to generate quiz: ${(error as Error).message}`);
+    }
+  }
+
+  private async sprEvaluate(args: string[]): Promise<void> {
+    const quizIdStr = args[0];
+    if (!quizIdStr) {
+      printError('Quiz ID is required. Usage: spr evaluate <quizId>');
+      return;
+    }
+
+    const quizId = parseInt(quizIdStr, 10);
+    if (isNaN(quizId)) {
+      printError('Invalid quiz ID');
+      return;
+    }
+
+    console.log('  Enter your answer:');
+    const userAnswer = await this.readLine('  > ');
+
+    try {
+      const result = await evaluateAnswer(quizId, userAnswer);
+      console.log();
+      if (result.isCorrect) {
+        printSuccess(`Correct! Score: ${result.score}/100`);
+      } else {
+        printError(`Incorrect. Score: ${result.score}/100`);
+      }
+      console.log(`  Feedback: ${result.feedback}`);
+      console.log();
+    } catch (error) {
+      printError(`Failed to evaluate: ${(error as Error).message}`);
+    }
+  }
+
+  private async sprTasks(): Promise<void> {
+    try {
+      const tasks = await getAllTasks();
+      console.log();
+      console.log('  \x1b[36mTasks:\x1b[0m');
+      console.log();
+
+      if (tasks.length === 0) {
+        console.log('  No tasks found. Use "spr analyze <file>" to create one.');
+        console.log();
+        return;
+      }
+
+      tasks.forEach((task: any) => {
+        console.log(`  \x1b[33mID: ${task.id}\x1b[0m`);
+        console.log(`    Type: ${task.type}`);
+        console.log(`    File: ${task.file_path}`);
+        console.log(`    Created: ${new Date(task.created_at).toLocaleString()}`);
+        console.log();
+      });
+    } catch (error) {
+      printError(`Failed to get tasks: ${(error as Error).message}`);
+    }
+  }
+
+  private async sprNotes(): Promise<void> {
+    try {
+      const notes = await getNotes();
+      console.log();
+      console.log('  \x1b[36mNotes:\x1b[0m');
+      console.log();
+
+      if (notes.length === 0) {
+        console.log('  No notes found.');
+        console.log();
+        return;
+      }
+
+      notes.forEach((note: any) => {
+        console.log(`  \x1b[33mID: ${note.id}\x1b[0m`);
+        console.log(`    Category: ${note.category}`);
+        console.log(`    Content: ${note.content?.slice(0, 50)}...`);
+        console.log(`    Created: ${new Date(note.created_at).toLocaleString()}`);
+        console.log();
+      });
+    } catch (error) {
+      printError(`Failed to get notes: ${(error as Error).message}`);
+    }
+  }
+
+  private async sprResults(args: string[]): Promise<void> {
+    const quizId = args[0] ? parseInt(args[0], 10) : undefined;
+
+    try {
+      const results = await getQuizResults(quizId);
+      console.log();
+      console.log('  \x1b[36mQuiz Results:\x1b[0m');
+      console.log();
+
+      if (results.length === 0) {
+        console.log('  No quiz results found.');
+        console.log();
+        return;
+      }
+
+      results.forEach((result: any) => {
+        console.log(`  \x1b[33mResult ID: ${result.id}\x1b[0m`);
+        console.log(`    Question: ${result.question_text?.slice(0, 50)}...`);
+        console.log(`    Your Answer: ${result.user_answer?.slice(0, 50)}...`);
+        console.log(`    Score: ${result.score}/100`);
+        console.log(`    Feedback: ${result.feedback}`);
+        console.log();
+      });
+    } catch (error) {
+      printError(`Failed to get results: ${(error as Error).message}`);
+    }
+  }
+
+  private async cmdHelp(): Promise<void> {
     console.log();
     console.log('\x1b[33m  Available Commands:\x1b[0m');
     console.log();
 
     const groups = [
+      {
+        name: 'SPR Learning',
+        commands: ['spr'],
+      },
       {
         name: 'AI Chat',
         commands: ['ask', 'talk'],
