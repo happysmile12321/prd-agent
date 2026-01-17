@@ -93,6 +93,12 @@ export class Editor {
     // 高亮匹配
     this.highlights = [];
 
+    // 自动命令
+    this.autocmds = [];
+
+    // 自定义命令
+    this.commands = {};
+
     // 监听器
     this.listeners = {
       modeChange: [],

@@ -153,6 +153,12 @@ class NeovimJS {
       createCommand: (name, fn, opts) => {
         this.editor.commands[name] = { callback: fn, ...opts };
       },
+      createAutocmd: (event, callback, opts = {}) => {
+        this.editor.autocmds.push({ event, callback, ...opts });
+      },
+      defineHighlight: (name, opts = {}) => {
+        this.editor.highlights.push({ name, ...opts });
+      },
       notify: (msg, level) => this.screen.showMessage(msg, level),
     };
     createLazyVimConfig(api);
