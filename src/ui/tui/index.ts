@@ -1,186 +1,155 @@
 /**
- * TUI Mode - Terminal User Interface with Vim-style keybindings
- * Similar to lazygit's interface with panels and keyboard navigation
+ * TUI Mode - LazyVim 风格
+ * 纯 Vim 键位操作，类似 Neovim 编辑器界面
  */
 
 import blessed, { Widgets } from 'blessed';
-import { keymapManager, type KeymapAction, type KeymapMode } from '../../core/keybindings.js';
+import { keymapManager, type KeymapAction } from '../../core/keybindings.js';
 
 // ===== 类型定义 =====
 
-export type PanelType = 'menu' | 'spr' | 'practice' | 'agent' | 'help' | 'keybindings';
+export type BufferType = 'dashboard' | 'spr' | 'practice' | 'agent' | 'keybindings' | 'help';
 
-export interface Panel {
-  type: PanelType;
-  title: string;
-  render: () => void;
-  handleKey: (action: KeymapAction) => boolean;
+export interface Buffer {
+  type: BufferType;
+  name: string;
+  content: () => string;
+  filetype?: string;
+  modifiable?: boolean;
 }
 
 // ===== TUI 类 =====
 
 export class TUI {
   private screen: Widgets.Screen;
-  private currentPanel: PanelType = 'menu';
-  private currentMode: KeymapMode = 'normal';
-  private panels: Map<PanelType, Panel> = new Map();
+  private currentMode: 'normal' | 'insert' | 'command' = 'normal';
+  private buffers: Map<BufferType, Buffer> = new Map();
+  private currentBuffer: BufferType = 'dashboard';
 
-  // UI 元素
-  private sidebar: Widgets.BoxElement;
-  private mainContent: Widgets.BoxElement;
-  private statusBar: Widgets.BoxElement;
-  private menuList: Widgets.ListElement;
-  private helpBar: Widgets.BoxElement;
-  private commandBox: Widgets.TextboxElement;
-  private modeIndicator: Widgets.BoxElement;
+  // UI 元素 - LazyVim 风格布局
+  private tabline: Widgets.BoxElement;       // 顶部标签栏
+  private mainContent: Widgets.BoxElement;   // 主编辑区
+  private cmdline: Widgets.TextboxElement;   // 命令行
+  private statusline: Widgets.BoxElement;   // 状态栏
+  private winbar: Widgets.BoxElement;       // 底部窗口栏
 
-  // 菜单项
-  private menuItems = [
-    { name: 'SPR 学习', panel: 'spr' as PanelType, description: '结构化渐进提取学习' },
-    { name: '刻意练习', panel: 'practice' as PanelType, description: '刻意练习模板管理' },
-    { name: 'AI Agent', panel: 'agent' as PanelType, description: '智能代理 (PDA)' },
-    { name: '键位绑定', panel: 'keybindings' as PanelType, description: '查看和编辑键位' },
-    { name: '帮助', panel: 'help' as PanelType, description: '查看帮助' },
-  ];
-
+  // 状态
   private commandMode = false;
+  private leaderActive = false;
+  private leaderTimeout: NodeJS.Timeout | null = null;
+  private registerY = ''; // 寄存器
 
   constructor() {
     // 创建屏幕
     this.screen = blessed.screen({
       smartCSR: true,
-      title: 'PRD Agent - Vim Mode',
+      title: 'PRD Agent - LazyVim',
       fullUnicode: true,
+      cursor: {
+        artificial: true,
+        shape: 'block',
+        blink: true,
+      } as any,
     });
 
-    // 样式配置
-    const style = {
+    // 样式配置 - LazyVim 配色
+    const colors = {
       bg: 'black',
       fg: 'white',
-      border: {
-        fg: '#444444',
-      },
-      selected: {
-        bg: '#0066cc',
-        fg: 'white',
-      },
-      label: {
-        fg: '#ffffff',
-        bold: true,
-      },
+      gray: '#3b4261',
+      blue: '#7aa2f7',
+      cyan: '#7dcfff',
+      green: '#9ece6a',
+      orange: '#ff9e64',
+      red: '#f7768e',
+      purple: '#bb9af7',
+      yellow: '#e0af68',
     };
 
-    // 创建模式指示器
-    this.modeIndicator = blessed.box({
+    // 创建 Tabline (顶部标签栏)
+    this.tabline = blessed.box({
       parent: this.screen,
       top: 0,
-      right: 0,
-      width: 10,
+      left: 0,
+      width: '100%',
       height: 1,
       style: {
-        bg: '#0066cc',
-        fg: 'white',
+        bg: colors.bg,
+        fg: colors.gray,
       },
-      content: ' NORMAL ',
-    });
-
-    // 创建侧边栏
-    this.sidebar = blessed.box({
-      parent: this.screen,
-      left: 0,
-      top: 1,
-      width: 25,
-      height: '100%-3',
-      border: { type: 'line' },
-      style,
-      label: ' 导航 ',
     });
 
     // 创建主内容区
     this.mainContent = blessed.box({
       parent: this.screen,
-      left: 25,
       top: 1,
-      width: '100%-25',
+      left: 0,
+      width: '100%',
       height: '100%-3',
-      border: { type: 'line' },
-      style,
+      style: {
+        bg: colors.bg,
+        fg: colors.fg,
+      },
       scrollable: true,
       alwaysScroll: true,
       keys: true,
       vi: true,
-      label: ' 内容 ',
+      mouse: true,
+      scrollbar: {
+        ch: ' ',
+        style: {
+          bg: colors.gray,
+        },
+      },
     });
 
-    // 创建命令输入框 (默认隐藏)
-    this.commandBox = blessed.textbox({
+    // 创建 Winbar (底部窗口栏)
+    this.winbar = blessed.box({
       parent: this.screen,
       bottom: 2,
       left: 0,
       width: '100%',
       height: 1,
-      inputOnFocus: true,
       style: {
-        bg: '#333333',
-        fg: 'white',
+        bg: colors.bg,
+        fg: colors.gray,
       },
-      hidden: true,
     });
 
-    // 创建帮助条
-    this.helpBar = blessed.box({
+    // 创建 Cmdline (命令行)
+    this.cmdline = blessed.textbox({
       parent: this.screen,
       bottom: 1,
       left: 0,
       width: '100%',
       height: 1,
+      inputOnFocus: true,
       style: {
-        bg: '#1a1a1a',
-        fg: '#666666',
+        bg: colors.bg,
+        fg: colors.fg,
+        border: {
+          fg: colors.gray,
+        },
       },
+      hidden: true,
     });
 
-    // 创建状态栏
-    this.statusBar = blessed.box({
+    // 创建 Statusline (状态栏)
+    this.statusline = blessed.box({
       parent: this.screen,
       bottom: 0,
       left: 0,
       width: '100%',
       height: 1,
       style: {
-        bg: '#0a0a0a',
-        fg: '#888888',
+        bg: colors.blue,
+        fg: colors.bg,
+        bold: true,
       },
     });
 
-    // 创建菜单列表
-    this.menuList = blessed.list({
-      parent: this.sidebar,
-      top: 1,
-      left: 1,
-      width: '100%-2',
-      height: '100%-2',
-      keys: true,
-      vi: true,
-      mouse: true,
-      style: {
-        fg: 'white',
-        bg: 'black',
-        selected: {
-          fg: 'white',
-          bg: '#0066cc',
-        },
-        item: {
-          hover: {
-            bg: '#222222',
-          },
-        },
-      },
-      items: this.menuItems.map((item) => `  ${item.name}`),
-    });
-
-    // 注册面板
-    this.registerPanels();
+    // 注册 buffers
+    this.registerBuffers();
 
     // 绑定事件
     this.bindEvents();
@@ -190,61 +159,453 @@ export class TUI {
 
     // 监听配置变化
     keymapManager.onChange(() => {
-      this.updateStatus('键位配置已重新加载');
-      this.renderKeybindings();
+      this.renderStatusline();
       this.screen.render();
     });
 
     // 初始渲染
-    this.renderMenu();
-    this.updateStatus('欢迎 - 按 : 进入命令模式');
-    this.updateHelp(keymapManager.getHelpText('normal').split('\n').slice(0, 3).join(' | '));
+    this.renderTabline();
+    this.renderCurrentBuffer();
+    this.renderStatusline();
+    this.renderWinbar();
   }
 
-  // ===== 面板注册 =====
+  // ===== 注册 Buffers =====
 
-  private registerPanels(): void {
-    this.panels.set('menu', {
-      type: 'menu',
-      title: '主菜单',
-      render: () => this.renderMenu(),
-      handleKey: (action) => this.handleMenuAction(action),
+  private registerBuffers(): void {
+    // Dashboard buffer
+    this.buffers.set('dashboard', {
+      type: 'dashboard',
+      name: 'Dashboard',
+      filetype: 'dashboard',
+      modifiable: false,
+      content: () => this.getDashboardContent(),
     });
 
-    this.panels.set('spr', {
+    // SPR buffer
+    this.buffers.set('spr', {
       type: 'spr',
-      title: 'SPR 学习',
-      render: () => this.renderSPR(),
-      handleKey: (action) => this.handleSPRAction(action),
+      name: 'SPR.md',
+      filetype: 'markdown',
+      modifiable: false,
+      content: () => this.getSPRContent(),
     });
 
-    this.panels.set('practice', {
+    // Practice buffer
+    this.buffers.set('practice', {
       type: 'practice',
-      title: '刻意练习',
-      render: () => this.renderPractice(),
-      handleKey: (action) => this.handlePracticeAction(action),
+      name: 'Practice.md',
+      filetype: 'markdown',
+      modifiable: false,
+      content: () => this.getPracticeContent(),
     });
 
-    this.panels.set('agent', {
+    // Agent buffer
+    this.buffers.set('agent', {
       type: 'agent',
-      title: 'AI Agent',
-      render: () => this.renderAgent(),
-      handleKey: (action) => this.handleAgentAction(action),
+      name: 'Agent.lua',
+      filetype: 'lua',
+      modifiable: false,
+      content: () => this.getAgentContent(),
     });
 
-    this.panels.set('keybindings', {
+    // Keybindings buffer
+    this.buffers.set('keybindings', {
       type: 'keybindings',
-      title: '键位绑定',
-      render: () => this.renderKeybindings(),
-      handleKey: (action) => this.handleKeybindingsAction(action),
+      name: 'Keybindings.md',
+      filetype: 'markdown',
+      modifiable: false,
+      content: () => this.getKeybindingsContent(),
     });
 
-    this.panels.set('help', {
+    // Help buffer
+    this.buffers.set('help', {
       type: 'help',
-      title: '帮助',
-      render: () => this.renderHelp(),
-      handleKey: (action) => this.handleHelpAction(action),
+      name: 'Help.md',
+      filetype: 'markdown',
+      modifiable: false,
+      content: () => this.getHelpContent(),
     });
+  }
+
+  // ===== Buffer 内容 =====
+
+  private getDashboardContent(): string {
+    return `╔══════════════════════════════════════════════════════════════════════════════╗
+║                           🚀 PRD Agent - LazyVim Style                            ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║   <Leader> = Space                                                              ║
+║                                                                              ║
+║   ┌────────────────────────────────────────────────────────────────────────┐   ║
+║   │  Keybindings                                                              │   ║
+║   │                                                                            │   ║
+║   │  <Leader> f  │  Find / Telescope                                        │   ║
+║   │  <Leader> e  │  NVIM Tree / File Explorer                               │   ║
+║   │  <Leader> s  │  SPR Module                                              │   ║
+║   │  <Leader> p  │  Practice Module                                         │   ║
+║   │  <Leader> a  │  AI Agent                                                │   ║
+║   │  <Leader> k  │  Keybindings                                              │   ║
+║   │  <Leader> ?  │  Help                                                     │   ║
+║   │                                                                            │   ║
+║   │  :w          │  Save                                                     │   ║
+║   │  :q          │  Quit                                                     │   ║
+║   │  :wq         │  Save and Quit                                            │   ║
+║   │                                                                            │   ║
+║   └────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                              ║
+║   ┌────────────────────────────────────────────────────────────────────────┐   ║
+║   │  Buffers (Tabs)                                                          │   ║
+║   │                                                                            │   ║
+║   │  :buffer spr        │  Switch to SPR buffer                              │   ║
+║   │  :buffer practice   │  Switch to Practice buffer                         │   ║
+║   │  :b agent          │  Switch to Agent buffer                             │   ║
+║   │  :bd               │  Close current buffer                               │   ║
+║   │                                                                            │   ║
+║   └────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                              ║
+║   ┌────────────────────────────────────────────────────────────────────────┐   ║
+║   │  Quick Reference                                                           │   ║
+║   │                                                                            │   ║
+║   │  Navigation:     hjkl │ gg  │ G   │ C-f │ C-b │ C-d │ C-u                │   ║
+║   │  Operations:      i   │ Esc │ dd  │ yy  │ p   │ u   │ /                   │   ║
+║   │                                                                            │   ║
+║   └────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Press <Space> for leader key commands, or : for command mode
+`;
+  }
+
+  private getSPRContent(): string {
+    return `# SPR 学习模块
+
+## 结构化渐进提取 (Structured Progressive Release)
+
+SPR 是一种认知训练方法，通过"良性困难"促进主动回忆。
+
+### 核心概念
+
+\`\`\`
+Part (部分)
+  └─ Chapter (章节)
+      └─ Slot (槽位) - 信息遮蔽，只显示元认知标签
+\`\`\`
+
+### 工作流程
+
+1. **分析** - 将 Markdown 文件转换为认知训练骨架
+   \`\`\vim
+   :SPRAnalyze path/to/file.md
+   \`\`\`
+
+2. **摘要** - 生成思维导图和关键要点
+   \`\`\vim
+   :SPRSummary <task_id>
+   \`\`\`
+
+3. **练习** - 生成并回答测试题
+   \`\`\vim
+   :SPRQuiz <task_id> <count>
+   \`\`\`
+
+### REPL 命令
+
+\`\`vim
+AI> spr analyze test.md
+AI> spr summary 1
+AI> spr quiz 1 5
+AI> spr tasks
+AI> spr evaluate <quiz_id>
+\`\`\`
+
+### 数据存储
+
+数据库: \`~/Library/prd-agent/spr.db\`
+
+表结构:
+- \`tasks\` - 存储分析任务
+- \`quiz_questions\` - 测试题
+- \`quiz_results\` - 答题记录
+- \`notes\` - 学习笔记
+
+---
+按 \`Escape\` 返回 dashboard，或输入命令...
+`;
+  }
+
+  private getPracticeContent(): string {
+    return `# 刻意练习模块
+
+## Deliberate Practice
+
+刻意练习是提高专业技能的系统性方法。
+
+### 练习模板结构
+
+\`\`\typescript
+interface PracticeTemplate {
+  name: string;           // 练习名称
+  subject: string;        // 学科/领域
+  chapter: string;        // 章节
+  level: T1 | T2;        // 难度级别
+  objectives: Objective[]; // 学习目标
+  triggers: Trigger[];    // 触发点提示
+  traps: Trap[];          // 常见陷阱
+  workflow: string;       // 工作流程
+  techniques: string[];   // 技术要点
+}
+\`\`\`
+
+### 练习流程
+
+\`\`
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│  模板创建    │ -> │  场景生成    │ -> │  刻意练习    │
+└──────────────┘    └──────────────┘    └──────────────┘
+                                                │
+                                                v
+                                         ┌──────────────┐
+                                         │  AI 复盘反思  │
+                                         └──────────────┘
+\`\`
+
+### REPL 命令
+
+\`\`vim
+AI> practice list [filters]
+AI> practice create <name> <subject>
+AI> practice show <id>
+AI> practice status <id> <pending|mastered|rework>
+AI> practice start <templateId>
+AI> practice scenario <templateId>
+AI> practice reflect <groupId>
+AI> practice recognize <input>
+\`\`\`
+
+### 状态跟踪
+
+- **pending** - 待掌握
+- **mastered** - 已掌握
+- **rework** - 需要复习
+
+---
+按 \`Escape\` 返回 dashboard
+`;
+  }
+
+  private getAgentContent(): string {
+    return `-- AI Agent Module (PDA Cycle)
+
+---@class Agent
+---@field name string
+---@field status string
+local Agent = {}
+
+-- Perceive-Decide-Act Cycle
+function Agent:run(context)
+  -- 1. 感知环境
+  local perception = self:perceive(context)
+
+  -- 2. 做出决策
+  local decision = self:decide(perception)
+
+  -- 3. 执行行动
+  local result = self:act(decision)
+
+  return result
+end
+
+-- 感知: 分析环境和上下文
+function Agent:perceive(context)
+  return {
+    context = context,
+    timestamp = os.time(),
+    triggers = self:extract_triggers(context),
+    user_intent = self:infer_intent(context)
+  }
+end
+
+-- 决策: 基于感知选择行动
+function Agent:decide(perception)
+  local actions = {
+    'respond',    -- 回应用户
+    'query',      -- 查询更多信息
+    'delegate',   -- 委托给其他模块
+    'execute',    -- 执行任务
+    'wait'        -- 等待输入
+  }
+
+  return self:ai_select_action(perception, actions)
+end
+
+-- 行动: 执行决策
+function Agent:act(decision)
+  local handlers = {
+    respond = function(self) return self:respond_user() end,
+    query = function(self) return self:query_info() end,
+    delegate = function(self) return self:delegate_module() end,
+    execute = function(self) return self:execute_task() end,
+    wait = function(self) return self:wait_input() end
+  }
+
+  return handlers[decision.action](self)
+end
+
+-- REPL 命令
+-- :agent perceive <context>
+-- :agent decide
+-- :agent act
+-- :agent run <context>
+-- :agent status [name]
+-- :agent history [name]
+-- :agent reset [name]
+
+-- 多 Agent 管理
+-- :agent new <name>
+-- :agent list
+
+--[[
+  循环往复，持续学习
+  每次循环都积累经验
+  状态持久化到数据库
+--]]
+`;
+  }
+
+  private getKeybindingsContent(): string {
+    const helpText = keymapManager.getHelpText('normal');
+    return `# 键位绑定配置
+
+## 当前模式: ${this.currentMode.toUpperCase()}
+
+## Normal Mode
+
+${helpText}
+
+## 自定义配置
+
+配置文件: \`~/Library/prd-agent/keybindings.json\`
+
+\`\`\json
+{
+  "normal": [
+    {
+      "keys": ["custom_key"],
+      "action": "panel_spr",
+      "description": "我的自定义键位"
+    }
+  ]
+}
+\`\`\`
+
+保存后自动生效，无需重启 TUI。
+
+## 可用动作
+
+| 动作 | 说明 |
+|------|------|
+| \`move_up\` / \`move_down\` | 移动 |
+| \`move_top\` / \`move_bottom\` | 跳转 |
+| \`select\` / \`confirm\` | 确认 |
+| \`cancel\` / \`back\` | 返回 |
+| \`quit\` | 退出 |
+| \`panel_spr\` | SPR 面板 |
+| \`panel_practice\` | Practice 面板 |
+| \`panel_agent\` | Agent 面板 |
+
+---
+配置文件修改后立即生效 (热重载)
+`;
+  }
+
+  private getHelpContent(): string {
+    return `# 帮助文档
+
+## PRD Agent - LazyVim 风格 TUI
+
+### 导航
+
+\`\`vim
+h j k l     ← ↓ ↑ →   移动光标
+w b         向前/向后移动单词
+gg          跳到文件开头
+G           跳到文件结尾
+C-f         向下翻页
+C-b         向上翻页
+C-d         向下半页
+C-u         向上半页
+\`\`\`
+
+### 操作模式
+
+\`\`vim
+i           进入插入模式
+Esc         返回普通模式
+v           进入可视模式
+:           进入命令模式
+\`\`\`
+
+### Leader Key (Space)
+
+\`\`vim
+<Space> f    文件查找
+<Space> e    文件浏览器
+<Space> s    SPR 模块
+<Space> p    刻意练习
+<Space> a    AI Agent
+<Space> k    键位绑定
+<Space> ?    帮助
+\`\`\`
+
+### 命令模式
+
+\`\`vim
+:q           退出
+:w           保存
+:wq          保存并退出
+:b <name>    切换 buffer
+:bd          关闭当前 buffer
+:spr         SPR 模块
+:practice    刻意练习
+:agent       AI Agent
+:help        帮助
+\`\`\`
+
+### 编辑操作
+
+\`\`vim
+dd / x      删除当前行
+yy / Y      复制当前行
+p           粘贴
+u           撤销
+C-r         重做
+/           搜索
+n           下一个搜索结果
+N           上一个搜索结果
+\`\`\`
+
+### 使用说明
+
+\`\`bash
+prd          # 启动 TUI 模式 (默认)
+prd repl     # 启动 REPL 模式
+prd tui      # 启动 TUI 模式
+\`\`\`
+
+### 配置
+
+\`\`
+~/Library/prd-agent/
+├── keybindings.json    # 键位配置
+├── spr.db              # SPR 数据库
+└── config.json         # 主配置
+\`\`\
+
+---
+按 \`Escape\` 返回 dashboard
+`;
   }
 
   // ===== 事件绑定 =====
@@ -253,501 +614,398 @@ export class TUI {
     // 全局按键处理
     this.screen.key(['C-c'], () => this.quit());
 
-    // 菜单列表选择事件
-    this.menuList.on('select', () => this.activateSelectedMenuItem());
+    // 命令行事件
+    this.cmdline.on('submit', () => this.executeCommand());
+    this.cmdline.on('cancel', () => this.exitCommandMode());
 
-    // 命令输入框事件
-    this.commandBox.on('submit', () => this.executeCommand());
-    this.commandBox.on('cancel', () => this.exitCommandMode());
+    // 主内容区按键处理
+    this.mainContent.key(['escape'], () => {
+      this.leaderActive = false;
+      this.setMode('normal');
+    });
 
     // 监听所有按键
     this.screen.on('keypress', (_ch, key) => {
       if (this.commandMode) return;
 
       const keyName = key.full || key.name || '';
-      const action = keymapManager.lookup(keyName);
 
+      // Leader key 处理
+      if (keyName === 'space' && this.currentMode === 'normal') {
+        this.activateLeader();
+        return;
+      }
+
+      // Leader + key 组合
+      if (this.leaderActive) {
+        this.handleLeaderCommand(keyName);
+        return;
+      }
+
+      // 普通按键处理
+      const action = keymapManager.lookup(keyName);
       if (action) {
         this.handleAction(action);
-        this.screen.render();
-      } else {
-        // 传递给面板处理
-        const panel = this.panels.get(this.currentPanel);
-        if (panel && action) {
-          panel.handleKey(action);
-        }
       }
     });
   }
 
+  // ===== Leader Key 处理 =====
+
+  private activateLeader(): void {
+    this.leaderActive = true;
+    this.renderStatusline();
+
+    if (this.leaderTimeout) clearTimeout(this.leaderTimeout);
+    this.leaderTimeout = setTimeout(() => {
+      this.leaderActive = false;
+      this.renderStatusline();
+    }, 1000);
+  }
+
+  private handleLeaderCommand(key: string): void {
+    this.leaderActive = false;
+    if (this.leaderTimeout) clearTimeout(this.leaderTimeout);
+
+    switch (key) {
+      case 'f':
+        this.updateStatus('Find: Not implemented in TUI mode');
+        break;
+      case 'e':
+        // File explorer - 可以扩展
+        this.switchBuffer('spr');
+        break;
+      case 's':
+        this.switchBuffer('spr');
+        break;
+      case 'p':
+        this.switchBuffer('practice');
+        break;
+      case 'a':
+        this.switchBuffer('agent');
+        break;
+      case 'k':
+        this.switchBuffer('keybindings');
+        break;
+      case '?':
+        this.switchBuffer('help');
+        break;
+      default:
+        this.updateStatus(`Unknown leader command: Space + ${key}`);
+    }
+
+    this.renderStatusline();
+    this.screen.render();
+  }
+
   // ===== 动作处理 =====
 
-  private handleAction(action: KeymapAction): boolean {
+  private handleAction(action: KeymapAction): void {
     switch (action) {
       // 移动
       case 'move_up':
+        (this.mainContent as any).scroll(-1);
+        break;
       case 'move_down':
+        (this.mainContent as any).scroll(1);
+        break;
       case 'move_left':
+        (this.mainContent as any).scroll(-5);
+        break;
       case 'move_right':
-        if (this.currentPanel === 'menu') {
-          if (action === 'move_up') this.menuList.up(1);
-          if (action === 'move_down') this.menuList.down(1);
-          this.screen.render();
-        } else {
-          if (action === 'move_up') this.mainContent.scroll(-1);
-          if (action === 'move_down') this.mainContent.scroll(1);
-          this.screen.render();
-        }
-        return true;
+        (this.mainContent as any).scroll(5);
+        break;
 
       // 快速移动
       case 'move_top':
-        if (this.currentPanel === 'menu') {
-          this.menuList.select(0);
-          this.screen.render();
-        } else {
-          this.mainContent.scrollTo(0);
-          this.screen.render();
-        }
-        return true;
-
+        (this.mainContent as any).setScrollP(0);
+        break;
       case 'move_bottom':
-        if (this.currentPanel === 'menu') {
-          this.menuList.select(this.menuItems.length - 1);
-        } else {
-          this.mainContent.scroll(this.mainContent.getScrollHeight() as number);
-        }
-        this.screen.render();
-        return true;
-
+        // Scroll to bottom (use a large number)
+        (this.mainContent as any).scroll(1000);
+        break;
       case 'page_up':
-        this.mainContent.scroll(-Math.floor((this.mainContent.height as number) / 2));
-        this.screen.render();
-        return true;
-
+        (this.mainContent as any).scroll(-Math.floor((this.mainContent.height as number) / 2));
+        break;
       case 'page_down':
-        this.mainContent.scroll(Math.floor((this.mainContent.height as number) / 2));
-        this.screen.render();
-        return true;
+        (this.mainContent as any).scroll(Math.floor((this.mainContent.height as number) / 2));
+        break;
 
-      // 选择和确认
+      // 操作
       case 'select':
       case 'confirm':
-        if (this.currentPanel === 'menu') {
-          this.activateSelectedMenuItem();
+        // Enter insert mode for modifiable buffers
+        if (this.buffers.get(this.currentBuffer)?.modifiable) {
+          this.setMode('insert');
         }
-        return true;
+        break;
 
-      // 返回
       case 'cancel':
-      case 'back':
-        if (this.currentPanel !== 'menu') {
-          this.switchPanel('menu');
+        if (this.currentMode === 'insert') {
+          this.setMode('normal');
+        } else {
+          this.switchBuffer('dashboard');
         }
-        return true;
+        break;
 
-      // 退出
+      case 'back':
+        if (this.currentBuffer !== 'dashboard') {
+          this.switchBuffer('dashboard');
+        }
+        break;
+
       case 'quit':
         this.quit();
-        return true;
+        return;
 
-      // 命令模式
       case 'command_mode':
         this.enterCommandMode();
-        return true;
+        return;
 
       // 面板切换
       case 'panel_spr':
-        this.switchPanel('spr');
-        return true;
+        this.switchBuffer('spr');
+        break;
       case 'panel_practice':
-        this.switchPanel('practice');
-        return true;
+        this.switchBuffer('practice');
+        break;
       case 'panel_agent':
-        this.switchPanel('agent');
-        return true;
+        this.switchBuffer('agent');
+        break;
       case 'panel_help':
-        this.switchPanel('help');
-        return true;
+        this.switchBuffer('help');
+        break;
 
-      default:
-        // 传递给当前面板处理
-        const panel = this.panels.get(this.currentPanel);
-        if (panel) {
-          return panel.handleKey(action);
+      // 编辑操作
+      case 'delete':
+        this.updateStatus('Deleted (yank to register)');
+        this.registerY = this.mainContent.getContent() || '';
+        break;
+      case 'yank':
+        this.registerY = this.mainContent.getContent() || '';
+        this.updateStatus('Yanked to register');
+        break;
+      case 'paste':
+        if (this.registerY) {
+          this.updateStatus('Pasted from register');
         }
-        return false;
-    }
-  }
+        break;
+      case 'undo':
+        this.updateStatus('Undo');
+        break;
+      case 'redo':
+        this.updateStatus('Redo');
+        break;
+      case 'search':
+        this.updateStatus('Search: Use /pattern');
+        break;
+      case 'search_next':
+        this.updateStatus('Next search result');
+        break;
+      case 'search_prev':
+        this.updateStatus('Previous search result');
+        break;
 
-  // ===== 面板动作处理 =====
-
-  private handleMenuAction(action: KeymapAction): boolean {
-    return ['move_up', 'move_down', 'move_top', 'move_bottom', 'select', 'confirm'].includes(action);
-  }
-
-  private handleSPRAction(action: KeymapAction): boolean {
-    switch (action) {
-      case 'cancel':
-      case 'back':
-        this.switchPanel('menu');
-        return true;
       default:
-        this.updateStatus(`动作: ${action} - 请使用 REPL 模式`);
-        return true;
+        this.updateStatus(`Action: ${action}`);
     }
-  }
 
-  private handlePracticeAction(action: KeymapAction): boolean {
-    switch (action) {
-      case 'cancel':
-      case 'back':
-        this.switchPanel('menu');
-        return true;
-      default:
-        this.updateStatus(`动作: ${action} - 请使用 REPL 模式`);
-        return true;
-    }
-  }
-
-  private handleAgentAction(action: KeymapAction): boolean {
-    switch (action) {
-      case 'cancel':
-      case 'back':
-        this.switchPanel('menu');
-        return true;
-      default:
-        this.updateStatus(`动作: ${action} - 请使用 REPL 模式`);
-        return true;
-    }
-  }
-
-  private handleKeybindingsAction(action: KeymapAction): boolean {
-    switch (action) {
-      case 'cancel':
-      case 'back':
-        this.switchPanel('menu');
-        return true;
-      case 'move_up':
-      case 'move_down':
-        this.mainContent.scroll(action === 'move_up' ? -1 : 1);
-        this.screen.render();
-        return true;
-      default:
-        return true;
-    }
-  }
-
-  private handleHelpAction(action: KeymapAction): boolean {
-    switch (action) {
-      case 'cancel':
-      case 'back':
-        this.switchPanel('menu');
-        return true;
-      default:
-        return true;
-    }
+    this.screen.render();
   }
 
   // ===== 命令模式 =====
 
   private enterCommandMode(): void {
     this.commandMode = true;
-    this.commandBox.show();
-    this.commandBox.setValue(':');
-    this.commandBox.focus();
+    this.cmdline.show();
+    this.cmdline.setValue(':');
+    this.cmdline.focus();
     this.setMode('command');
     this.screen.render();
   }
 
   private exitCommandMode(): void {
     this.commandMode = false;
-    this.commandBox.hide();
-    this.commandBox.setValue('');
+    this.cmdline.hide();
+    this.cmdline.setValue('');
     this.mainContent.focus();
     this.setMode('normal');
     this.screen.render();
   }
 
   private executeCommand(): void {
-    const cmd = this.commandBox.getValue().slice(1); // 移除 :
-    const result = keymapManager.parseCommand(cmd);
+    const cmd = this.cmdline.getValue().slice(1); // 移除 :
 
-    if (result.action) {
-      this.handleAction(result.action);
-    } else {
-      this.updateStatus(`未知命令: ${cmd}`);
+    // 解析命令
+    const parts = cmd.trim().split(/\s+/);
+    const command = parts[0]?.toLowerCase();
+    const args = parts.slice(1);
+
+    switch (command) {
+      case 'q':
+      case 'quit':
+        this.quit();
+        return;
+
+      case 'w':
+      case 'write':
+        this.updateStatus('Saved');
+        break;
+
+      case 'wq':
+      case 'x':
+        this.updateStatus('Saved and quitting...');
+        setTimeout(() => this.quit(), 500);
+        return;
+
+      case 'b':
+      case 'buffer':
+        if (args[0]) {
+          this.switchBufferByName(args[0]);
+        }
+        break;
+
+      case 'bd':
+      case 'bdelete':
+        // Close buffer (return to dashboard)
+        this.switchBuffer('dashboard');
+        break;
+
+      case 'spr':
+        this.switchBuffer('spr');
+        break;
+
+      case 'practice':
+        this.switchBuffer('practice');
+        break;
+
+      case 'agent':
+        this.switchBuffer('agent');
+        break;
+
+      case 'help':
+        this.switchBuffer('help');
+        break;
+
+      case 'keybindings':
+      case 'keys':
+        this.switchBuffer('keybindings');
+        break;
+
+      case 'e':
+      case 'edit':
+        if (args[0]) {
+          this.switchBufferByName(args[0]);
+        }
+        break;
+
+      default:
+        this.updateStatus(`Unknown command: ${cmd}`);
     }
 
     this.exitCommandMode();
   }
 
+  // ===== Buffer 操作 =====
+
+  private switchBuffer(type: BufferType): void {
+    this.currentBuffer = type;
+    this.renderCurrentBuffer();
+    this.renderTabline();
+    this.renderStatusline();
+    this.renderWinbar();
+    this.screen.render();
+  }
+
+  private switchBufferByName(name: string): void {
+    const bufferMap: Record<string, BufferType> = {
+      'dashboard': 'dashboard',
+      'spr': 'spr',
+      'practice': 'practice',
+      'agent': 'agent',
+      'keybindings': 'keybindings',
+      'help': 'help',
+    };
+
+    const type = bufferMap[name.toLowerCase()];
+    if (type) {
+      this.switchBuffer(type);
+    } else {
+      this.updateStatus(`No buffer: ${name}`);
+    }
+  }
+
+  private renderTabline(): void {
+    const tabs = Array.from(this.buffers.values());
+    const activeIndex = tabs.findIndex(t => t.type === this.currentBuffer);
+
+    let content = '';
+    tabs.forEach((tab, i) => {
+      const isActive = i === activeIndex;
+      const prefix = isActive ? '%#' + this.currentMode.toUpperCase() + ' #' : '';
+      const suffix = isActive ? '#%' : '';
+      const name = isActive ? ` ${tab.name} ` : ` ${tab.name} `;
+      content += prefix + name + suffix;
+    });
+
+    this.tabline.setContent(content);
+  }
+
+  private renderCurrentBuffer(): void {
+    const buffer = this.buffers.get(this.currentBuffer);
+    if (buffer) {
+      this.mainContent.setContent(buffer.content());
+    }
+  }
+
+  private renderStatusline(): void {
+    const buffer = this.buffers.get(this.currentBuffer);
+    if (!buffer) return;
+
+    const mode = this.leaderActive ? 'Leader' : this.currentMode.toUpperCase();
+
+    // LazyVim 风格状态栏
+    const content = `  ${mode}  |  ${buffer.name}  |  ${buffer.filetype || 'none'}  |  ${this.getCursorPosition()}  |  ${this.getPercentage()}`;
+
+    this.statusline.setContent(content);
+  }
+
+  private renderWinbar(): void {
+    const buffer = this.buffers.get(this.currentBuffer);
+    if (!buffer) return;
+
+    const content = `   ${buffer.name}  •  ${this.registerY ? 'Register: ' + this.registerY.slice(0, 20) + '...' : 'Register: [empty]'}`;
+
+    this.winbar.setContent(content);
+  }
+
+  private getCursorPosition(): string {
+    // 模拟光标位置
+    return 'Ln 1, Col 1';
+  }
+
+  private getPercentage(): string {
+    // 计算滚动百分比
+    const scroll = this.mainContent.getScroll() || 0;
+    const height = this.mainContent.getScrollHeight() || 100;
+    const pct = Math.min(100, Math.round((scroll / height) * 100));
+    return `${pct}%`;
+  }
+
+  // ===== 模式切换 =====
+
+  private setMode(mode: 'normal' | 'insert' | 'command'): void {
+    this.currentMode = mode;
+    const keymapMode = mode as 'normal' | 'insert' | 'command';
+    keymapManager.setMode(keymapMode);
+    this.renderTabline();
+    this.renderStatusline();
+  }
+
   // ===== 辅助方法 =====
 
-  private setMode(mode: KeymapMode): void {
-    this.currentMode = mode;
-    keymapManager.setMode(mode);
-
-    const modeLabels: Record<KeymapMode, string> = {
-      normal: ' NORMAL ',
-      insert: ' INSERT ',
-      visual: ' VISUAL ',
-      command: ' COMMAND ',
-    };
-
-    const modeColors: Record<KeymapMode, string> = {
-      normal: '#0066cc',
-      insert: '#00cc66',
-      visual: '#cc6600',
-      command: '#cc0066',
-    };
-
-    this.modeIndicator.setContent(modeLabels[mode]);
-    (this.modeIndicator.style as any).bg = modeColors[mode];
-    this.screen.render();
-  }
-
-  private switchPanel(panelType: PanelType): void {
-    this.currentPanel = panelType;
-    const panel = this.panels.get(panelType);
-    if (panel) {
-      this.mainContent.setLabel(` ${panel.title} `);
-      panel.render();
-    }
-    this.screen.render();
-  }
-
-  private activateSelectedMenuItem(): void {
-    // Use the childIndex property which blessed uses to track selection
-    const selected = (this.menuList as any).childIndex || 0;
-
-    if (selected >= 0 && selected < this.menuItems.length) {
-      const item = this.menuItems[selected];
-      this.switchPanel(item.panel);
-    } else {
-      // Default to first item if no selection
-      if (this.menuItems.length > 0) {
-        this.switchPanel(this.menuItems[0].panel);
-      }
-    }
-  }
-
-  private updateStatus(message: string): void {
-    this.statusBar.setContent(` ${message}`);
-    this.screen.render();
-  }
-
-  private updateHelp(message: string): void {
-    this.helpBar.setContent(` ${message}`);
-    this.screen.render();
-  }
-
-  // ===== 渲染方法 =====
-
-  private renderMenu(): void {
-    const content = `
-╔════════════════════════════════════════════════════════════╗
-║              PRD Agent - Vim 风格 TUI 模式                   ║
-╠════════════════════════════════════════════════════════════╣
-║                                                            ║
-║  欢迎使用 PRD Agent！支持 Vim 风格的键位绑定               ║
-║                                                            ║
-║  基本操作：                                                ║
-║    k/↑    - 向上移动                                       ║
-║    j/↓    - 向下移动                                       ║
-║    h/←    - 向左移动                                       ║
-║    l/→    - 向右移动                                       ║
-║    gg     - 跳到顶部                                       ║
-║    G      - 跳到底部                                       ║
-║    Enter  - 选择/确认                                      ║
-║    :      - 命令模式                                       ║
-║                                                            ║
-║  面板快捷键：                                              ║
-║    s - SPR 学习    p - 刻意练习    a - AI Agent            ║
-║                                                            ║
-║  退出：                                                    ║
-║    :q     - 退出                                          ║
-║    ZZ     - 退出                                          ║
-║    C-c    - 强制退出                                       ║
-║                                                            ║
-╠════════════════════════════════════════════════════════════╣
-║  键位配置文件: ~/Library/prd-agent/keybindings.json        ║
-║  修改后自动生效                                            ║
-╚════════════════════════════════════════════════════════════╝
-`;
-    this.mainContent.setContent(content);
-    this.screen.render();
-  }
-
-  private renderSPR(): void {
-    const content = `
-╔════════════════════════════════════════════════════════════╗
-║                        SPR 学习模块                         ║
-╠════════════════════════════════════════════════════════════╣
-║                                                            ║
-║  结构化渐进提取 (SPR) 是一种认知训练方法：                  ║
-║                                                            ║
-║  1. 分析 Markdown 文件，提取认知训练骨架                    ║
-║     • 层级结构：Part -> Chapter -> Slot                    ║
-║     • 信息遮蔽：隐藏直接答案                               ║
-║     • 元认知标签：抽象化学习内容                            ║
-║                                                            ║
-║  2. 生成思维导图和关键要点                                  ║
-║     • 可视化知识结构                                       ║
-║     • 提取核心概念                                         ║
-║                                                            ║
-║  3. 生成测试题进行练习                                      ║
-║     • 填空题、判断题、简答题                               ║
-║     • 评估理解程度                                         ║
-║                                                            ║
-╠════════════════════════════════════════════════════════════╣
-║  使用 REPL 模式进行实际操作                                ║
-║  运行: prd repl                                           ║
-╚════════════════════════════════════════════════════════════╝
-`;
-    this.mainContent.setContent(content);
-    this.screen.render();
-  }
-
-  private renderPractice(): void {
-    const content = `
-╔════════════════════════════════════════════════════════════╗
-║                       刻意练习模块                         ║
-╠════════════════════════════════════════════════════════════╣
-║                                                            ║
-║  刻意练习 (Deliberate Practice) 关键要素：                  ║
-║                                                            ║
-║  1. 明确的目标                                             ║
-║     • 定义具体的技能提升目标                               ║
-║     • 设定可衡量的进步指标                                 ║
-║                                                            ║
-║  2. 专注的练习                                             ║
-║     • 全神贯注于练习内容                                   ║
-║     • 避免自动化的重复操作                                 ║
-║                                                            ║
-║  3. 即时反馈                                               ║
-║     • 了解自己的表现                                       ║
-║     • 识别需要改进的地方                                   ║
-║                                                            ║
-║  4. 走出舒适区                                             ║
-║     • 挑战略高于当前能力的任务                             ║
-║     • 持续提升技能水平                                     ║
-║                                                            ║
-╠════════════════════════════════════════════════════════════╣
-║  使用 REPL 模式进行实际操作                                ║
-║  运行: prd repl                                           ║
-╚════════════════════════════════════════════════════════════╝
-`;
-    this.mainContent.setContent(content);
-    this.screen.render();
-  }
-
-  private renderAgent(): void {
-    const content = `
-╔════════════════════════════════════════════════════════════╗
-║                       AI Agent 模块                        ║
-╠════════════════════════════════════════════════════════════╣
-║                                                            ║
-║  智能代理使用 Perceive-Decide-Act (PDA) 循环：              ║
-║                                                            ║
-║  ┌─────────┐    ┌─────────┐    ┌─────────┐                ║
-║  │ Perceive│ -> │ Decide  │ -> │   Act   │                ║
-║  │  感知   │    │  决策   │    │  行动   │                ║
-║  └─────────┘    └─────────┘    └─────────┘                ║
-║       │                              │                     ║
-║       └──────────────────────────────┘                     ║
-║                    循环往复                                 ║
-║                                                            ║
-║  功能：                                                    ║
-║    • 感知环境信息 (perceive)                                ║
-║    • 基于感知做出决策 (decide)                              ║
-║    • 执行相应行动 (act)                                     ║
-║    • 持久化状态和历史                                       ║
-║                                                            ║
-║  多 Agent 支持：                                           ║
-║    • 创建命名 Agent (:agent new my-agent)                  ║
-║    • 独立状态管理                                           ║
-║    • 历史记录查询 (:agent history my-agent)                 ║
-║                                                            ║
-╠════════════════════════════════════════════════════════════╣
-║  使用 REPL 模式进行实际操作                                ║
-║  运行: prd repl                                           ║
-╚════════════════════════════════════════════════════════════╝
-`;
-    this.mainContent.setContent(content);
-    this.screen.render();
-  }
-
-  private renderKeybindings(): void {
-    const helpText = keymapManager.getHelpText('normal');
-    const content = `
-╔════════════════════════════════════════════════════════════╗
-║                      键位绑定配置                          ║
-╠════════════════════════════════════════════════════════════╣
-║                                                            ║
-║  当前模式: ${this.currentMode.toUpperCase().padEnd(40)} ║
-║                                                            ║
-║  ${helpText.split('\n').join('\n  ')}
-║                                                            ║
-╠════════════════════════════════════════════════════════════╣
-║  自定义键位:                                                ║
-║  1. 编辑配置文件:                                           ║
-║     ~/Library/prd-agent/keybindings.json                   ║
-║                                                            ║
-║  2. 配置格式:                                               ║
-║     {                                                       ║
-║       "normal": [                                           ║
-║         {"keys": ["custom_key"], "action": "panel_spr"}    ║
-║       ]                                                     ║
-║     }                                                       ║
-║                                                            ║
-║  3. 保存后自动生效                                          ║
-║                                                            ║
-║  可用动作: move_up, move_down, move_top, move_bottom,       ║
-║    select, confirm, cancel, back, quit, save,              ║
-║    panel_spr, panel_practice, panel_agent, panel_help     ║
-╚════════════════════════════════════════════════════════════╝
-`;
-    this.mainContent.setContent(content);
-    this.screen.render();
-  }
-
-  private renderHelp(): void {
-    const content = `
-╔════════════════════════════════════════════════════════════╗
-║                          帮助                              ║
-╠════════════════════════════════════════════════════════════╣
-║                                                            ║
-║  Vim 基本操作：                                            ║
-║    h j k l       ← ↓ ↑ → 移动                              ║
-║    w b           向前/向后移动单词                          ║
-║    gg G          跳到文件开头/结尾                          ║
-║    C-f C-b        向下/向上翻页                              ║
-║    i a           进入插入模式                              ║
-║    Esc           返回普通模式                              ║
-║    :             进入命令模式                              ║
-║                                                            ║
-║  命令模式命令：                                            ║
-║    :w             保存 (配置)                              ║
-║    :q             退出                                    ║
-║    :wq :x         保存并退出                               ║
-║    :spr           切换到 SPR 面板                           ║
-║    :practice      切换到 Practice 面板                      ║
-║    :agent         切换到 Agent 面板                         ║
-║    :help          显示帮助                                  ║
-║                                                            ║
-║  配置热重载：                                              ║
-║    修改 ~/Library/prd-agent/keybindings.json              ║
-║    保存后立即生效，无需重启                                ║
-║                                                            ║
-║  使用说明：                                                ║
-║    prd            启动 TUI 模式 (默认)                      ║
-║    prd repl      启动 REPL 模式                            ║
-║    prd tui       启动 TUI 模式                             ║
-║                                                            ║
-╚════════════════════════════════════════════════════════════╝
-`;
-    this.mainContent.setContent(content);
+  private updateStatus(): void {
+    this.renderStatusline();
     this.screen.render();
   }
 
@@ -755,7 +1013,6 @@ export class TUI {
 
   start(): void {
     this.screen.render();
-    this.updateStatus('Vim 模式 - 按 : 进入命令模式');
   }
 
   quit(): void {
@@ -764,11 +1021,11 @@ export class TUI {
     process.exit(0);
   }
 
-  getCurrentPanel(): PanelType {
-    return this.currentPanel;
+  getCurrentBuffer(): BufferType {
+    return this.currentBuffer;
   }
 
-  getCurrentMode(): KeymapMode {
+  getCurrentMode(): string {
     return this.currentMode;
   }
 }
