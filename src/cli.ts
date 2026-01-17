@@ -9,13 +9,14 @@ import { deleteCmd } from './commands/delete.js';
 import { complete } from './commands/complete.js';
 import { search } from './commands/search.js';
 import { listTags } from './commands/tags.js';
+import { setApiCmd, showConfig, aiGenerate, aiAnalyze, aiSummary } from './commands/ai.js';
 import { printInfo } from './ui/printer.js';
 
 const program = new Command();
 
 program
   .name('prd')
-  .description('A CLI task management tool')
+  .description('A CLI task management tool with AI')
   .version('0.1.0');
 
 // 添加任务
@@ -82,6 +83,39 @@ program
   .command('tags')
   .description('List all tags')
   .action(listTags);
+
+// ===== AI 命令 =====
+
+// 配置
+program
+  .command('config')
+  .description('Manage configuration')
+  .action(showConfig);
+
+program
+  .command('set-api [key]')
+  .description('Set Zhipu AI API Key')
+  .action(setApiCmd);
+
+// AI 生成任务
+program
+  .command('generate [prompt]')
+  .alias('gen')
+  .description('AI generate tasks from description')
+  .action(aiGenerate);
+
+// AI 分析任务
+program
+  .command('analyze <id-or-index>')
+  .alias('ai')
+  .description('AI analyze a task')
+  .action(aiAnalyze);
+
+// AI 总结
+program
+  .command('summary')
+  .description('AI summarize your tasks')
+  .action(aiSummary);
 
 // 默认命令 - 显示帮助
 program.action(() => {

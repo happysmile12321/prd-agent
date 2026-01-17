@@ -1,10 +1,11 @@
 # PRD Agent
 
-一个类似 Claude Code 风格的 CLI 任务管理工具 - 命令行交互模式。
+一个集成智谱AI 的 CLI 任务管理工具。
 
 ## 功能特性
 
 - 📝 简洁的命令行界面
+- 🤖 AI 生成任务、分析任务、智能总结
 - 🏷️ 标签分类管理
 - 🔍 快速搜索过滤
 - 💾 本地数据存储
@@ -18,7 +19,51 @@ npm run build
 npm link
 ```
 
-## 使用方法
+## 配置 AI
+
+首先设置智谱AI的 API Key：
+
+```bash
+prd set-api f6608b1468ac4416bb69ec9c6a7d99f7.EdbqnjW2wcg2i13U
+```
+
+或通过环境变量：
+
+```bash
+export ZHIPU_API_KEY=f6608b1468ac4416bb69ec9c6a7d99f7.EdbqnjW2wcg2i13U
+```
+
+查看配置：
+
+```bash
+prd config
+```
+
+## AI 功能
+
+### 生成任务
+
+```bash
+# AI 根据描述生成任务
+prd gen "准备下个月的产品发布"
+
+prd generate "实现用户登录功能，包括注册、登录、找回密码"
+```
+
+### 分析任务
+
+```bash
+prd analyze 1
+prd ai 1
+```
+
+### 智能总结
+
+```bash
+prd summary
+```
+
+## 常规命令
 
 ### 添加任务
 
@@ -85,7 +130,6 @@ prd edit 1 --status done --priority high
 ### 完成任务
 
 ```bash
-# 切换完成状态
 prd complete 1
 prd done 1
 ```
@@ -93,11 +137,10 @@ prd done 1
 ### 删除任务
 
 ```bash
-# 删除（会确认）
 prd delete 1
 prd rm 1
 
-# 强制删除（不确认）
+# 强制删除
 prd delete 1 --force
 ```
 
@@ -111,7 +154,6 @@ prd search "login"
 ### 标签
 
 ```bash
-# 列出所有标签
 prd tags
 ```
 
@@ -121,9 +163,10 @@ prd tags
 - [commander](https://github.com/tj/commander.js) - CLI 框架
 - [inquirer](https://github.com/SBoudrias/Inquirer.js) - 交互式提示
 - [chalk](https://github.com/chalk/chalk) - 样式输出
+- 智谱AI API
 
 ## 数据存储
 
-任务数据默认存储在 `~/.prd-agent/tasks.json`。
-
-可通过环境变量 `PRD_AGENT_DATA` 自定义数据目录。
+任务数据存储在 `~/.prd-agent/`：
+- `tasks.json` - 任务数据
+- `config.json` - 配置文件（API Key）
