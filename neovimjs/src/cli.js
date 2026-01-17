@@ -53,7 +53,12 @@ class NeovimJS {
 
   async setup() {
     // 初始化 UI
-    this.screen.init(this.editor);
+    this.screen.init(this.editor, {
+      normalMode: this.normalMode,
+      insertMode: this.insertMode,
+      visualMode: this.visualMode,
+      commandMode: this.commandMode,
+    });
 
     // 监听编辑器事件
     this.screen.on('editorAction', (data) => this.handleAction(data));

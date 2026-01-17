@@ -63,25 +63,9 @@ export class Screen {
   }
 
   setupEventHandlers() {
-    // 键盘输入
-    this.screen.key(['escape'], () => {
-      if (this.editor?.getMode() === 'insert') {
-        this.editor.setMode('normal');
-      }
-      this.render();
-    });
-
     // 全局按键处理
     this.screen.on('key', (ch, key) => {
       this.handleKeyPress(ch, key);
-    });
-
-    // 退出
-    this.screen.key(['C-c'], () => {
-      // 需要在 insert 模式外才能退出
-      if (this.editor?.getMode() !== 'insert') {
-        this.quit();
-      }
     });
 
     // 响应终端大小变化
@@ -93,11 +77,21 @@ export class Screen {
   handleKeyPress(ch, key) {
     if (!this.editor) return;
 
-    const mode = this.editor.getMode();
-
-    // 处理特殊按键
+    // 处理 Escape 键 - 退出 insert 模式
     if (key && key.name === 'escape') {
+      if (this.editor.getMode() === 'insert') {
+        this.editor.setMode('normal');
+      }
       this.inputBuffer = '';
+      this.render();
+      return;
+    }
+
+    // Ctrl+C 退出
+    if (key && key.ctrl && key.name === 'c') {
+      if (this.editor.getMode() !== 'insert') {
+        this.quit();
+      }
       return;
     }
 
@@ -149,6 +143,7 @@ export class Screen {
     this.inputTimeout = setTimeout(() => {
       this.processInput(this.inputBuffer);
       this.inputBuffer = '';
+      this.render();
     }, this.editor.options.timeoutlen || 1000);
 
     // 尝试立即处理
@@ -159,6 +154,7 @@ export class Screen {
         clearTimeout(this.inputTimeout);
         this.inputTimeout = null;
       }
+      this.render();
     }
   }
 
@@ -167,10 +163,20 @@ export class Screen {
 
     const mode = this.editor.getMode().split(' ')[0];
 
+    // Normal / Visual 模式 - 直接处理
+    if (mode === 'normal' || mode === 'visual') {
+      if (mode === 'normal') {
+        this.normalMode.handle(input);
+      } else {
+        this.visualMode.handle(input);
+      }
+      return true;
+    }
+
     // 插入模式直接发送字符
     if (mode === 'insert') {
       if (input.length === 1 || input === '<CR>' || input === '<Tab>' || input === '<BS>') {
-        this.emit('editorAction', { type: 'insert', data: input });
+        this.insertMode.handle(input);
         return true;
       }
       return true;
@@ -179,29 +185,39 @@ export class Screen {
     // 命令模式
     if (mode === 'command') {
       if (input === '<CR>') {
-        const cmd = this.cmdline?.getContent() || '';
-        this.emit('editorAction', { type: 'command', data: cmd });
+        const cmd = this.cmdline?.getValue() || '';
+        this.commandMode.execute(cmd);
         this.editor.setMode('normal');
         return true;
       } else if (input === '<Esc>' || input === '<C-c>') {
         this.editor.setMode('normal');
         return true;
       } else if (input.length === 1 || input === '<BS>') {
-        this.emit('editorAction', { type: 'commandInput', data: input });
+        this.commandMode.handle(input);
+        // 更新命令行显示
+        if (this.cmdline) {
+          this.cmdline.setValue(':' + this.commandMode.commandBuffer);
+        }
         return true;
       }
       return true;
     }
 
-    // Normal / Visual 模式
-    this.emit('editorAction', { type: 'normal', data: input });
-    return true;
+    return false;
   }
 
   // ========== 初始化 UI 组件 ==========
 
-  init(editor) {
+  init(editor, modeHandlers) {
     this.editor = editor;
+
+    // 设置模式处理器引用
+    if (modeHandlers) {
+      this.normalMode = modeHandlers.normalMode;
+      this.insertMode = modeHandlers.insertMode;
+      this.visualMode = modeHandlers.visualMode;
+      this.commandMode = modeHandlers.commandMode;
+    }
 
     // 清除现有元素
     this.screen.children.forEach(c => this.screen.remove(c));
