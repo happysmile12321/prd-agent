@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>公基备考计划 | 2026年5月16日</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f5f5; color: #333; padding: 20px; }
+  h1 { text-align: center; font-size: 20px; margin-bottom: 4px; color: #111; }
+  .subtitle { text-align: center; color: #888; font-size: 13px; margin-bottom: 20px; }
+  .countdown { text-align: center; background: #111; color: #fff; border-radius: 10px; padding: 14px; margin-bottom: 20px; font-size: 15px; }
+  .countdown span { font-size: 32px; font-weight: bold; color: #f0c040; }
+
+  .phases { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .phase { flex: 1; min-width: 220px; background: #fff; border-radius: 10px; padding: 14px; border-top: 4px solid #ccc; }
+  .phase.active { border-top-color: #4caf50; }
+  .phase.upcoming { border-top-color: #2196f3; }
+  .phase.future { border-top-color: #9c27b0; }
+  .phase-title { font-weight: bold; font-size: 14px; margin-bottom: 4px; }
+  .phase-date { font-size: 12px; color: #888; margin-bottom: 10px; }
+  .phase ul { padding-left: 16px; font-size: 13px; line-height: 1.8; color: #555; }
+
+  .section { background: #fff; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .section-title { font-weight: bold; font-size: 15px; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+
+  .todo-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+  .todo-item:last-child { border-bottom: none; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: bold; white-space: nowrap; flex-shrink: 0; margin-top: 1px; }
+  .badge.urgent { background: #ffe0e0; color: #c62828; }
+  .badge.important { background: #fff3e0; color: #e65100; }
+  .badge.later { background: #e8f5e9; color: #2e7d32; }
+  .badge.done { background: #e0e0e0; color: #757575; }
+  .todo-text { flex: 1; line-height: 1.5; }
+  .todo-text .when { font-size: 11px; color: #999; display: block; margin-top: 2px; }
+
+  .score-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .score-table th { background: #f5f5f5; padding: 8px 10px; text-align: left; font-weight: bold; }
+  .score-table td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; }
+  .score-table tr:last-child td { border-bottom: none; }
+  .star { color: #f0c040; }
+
+  .tip { background: #e3f2fd; border-left: 4px solid #1976d2; padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 13px; color: #1565c0; margin-top: 10px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<h1>🎯 公基备考计划</h1>
+<p class="subtitle">目标：80~90分 | 考试：2026年5月16/18日</p>
+
+<div class="countdown">
+  距考试还有 <span id="days">--</span> 天
+</div>
+
+<!-- 三阶段 -->
+<div class="phases">
+  <div class="phase active">
+    <div class="phase-title">📖 阶段一：打基础</div>
+    <div class="phase-date">3月30日 → 4月21日（23天）</div>
+    <ul>
+      <li>法律系统学完（三色笔记→Claude→Anki）</li>
+      <li>时政1-3月过完→制Anki卡</li>
+      <li>其余模块每天刷Anki保温</li>
+      <li>了解作文套路，背万能素材</li>
+    </ul>
+  </div>
+  <div class="phase upcoming">
+    <div class="phase-title">⚡ 阶段二：强化提升</div>
+    <div class="phase-date">4月22日 → 5月1日（10天）</div>
+    <ul>
+      <li>分模块专项刷真题，每天20道+</li>
+      <li>错题发Claude解析，更新错题记录</li>
+      <li>公文改错专项练2-3篇</li>
+      <li>练写作文1篇，发Claude批改</li>
+    </ul>
+  </div>
+  <div class="phase future">
+    <div class="phase-title">🚀 阶段三：冲刺</div>
+    <div class="phase-date">5月2日 → 5月15日（14天）</div>
+    <ul>
+      <li>补4月时政Anki（等更新）</li>
+      <li>每天翻高频考点速查表</li>
+      <li>重点复盘：时政、法律、河南省情</li>
+      <li>再练作文1篇，固化节奏</li>
+      <li>考前押题/冲刺卷</li>
+    </ul>
+  </div>
+</div>
+
+<!-- 待办清单 -->
+<div class="section">
+  <div class="section-title">📋 待办清单</div>
+
+  <div class="todo-item">
+    <span class="badge urgent">紧急</span>
+    <div class="todo-text">
+      <strong>法律</strong>：三色笔记，民法→行政法→刑法→宪法→法理，每章学完问Claude做Anki
+      <span class="when">👉 今天下午开始，贯穿整个阶段一</span>
+    </div>
+  </div>
+
+  <div class="todo-item">
+    <span class="badge urgent">紧急</span>
+    <div class="todo-text">
+      <strong>时政1-3月</strong>：过手里已买的资料，边学边做Anki卡片
+      <span class="when">👉 阶段一，法律和时政交替进行</span>
+    </div>
+  </div>
+
+  <div class="todo-item">
+    <span class="badge important">重要</span>
+    <div class="todo-text">
+      <strong>河南省情</strong>：背 <code>02_河南省情清单.md</code>，1天搞定
+      <span class="when">👉 阶段一中期安排一天集中背</span>
+    </div>
+  </div>
+
+  <div class="todo-item">
+    <span class="badge important">重要</span>
+    <div class="todo-text">
+      <strong>3月下+4月时政</strong>：机构更新后补购，出了就做卡
+      <span class="when">👉 跟进购买，不用主动催</span>
+    </div>
+  </div>
+
+  <div class="todo-item">
+    <span class="badge important">重要</span>
+    <div class="todo-text">
+      <strong>真题计时演练</strong>：4月22日后开始，从2024年联考起，做完发Claude解析
+      <span class="when">👉 阶段二开始</span>
+    </div>
+  </div>
+
+  <div class="todo-item">
+    <span class="badge later">后期</span>
+    <div class="todo-text">
+      <strong>作文练习</strong>：练写1篇发Claude批改
+      <span class="when">👉 4月22日后（阶段二）</span>
+    </div>
+  </div>
+
+  <div class="todo-item">
+    <span class="badge later">后期</span>
+    <div class="todo-text">
+      <strong>公文改错专项</strong>：拿2024/2025真题自己改一遍，对答案
+      <span class="when">👉 阶段二</span>
+    </div>
+  </div>
+
+  <div class="todo-item">
+    <span class="badge later">后期</span>
+    <div class="todo-text">
+      <strong>高频考点保温</strong>：每天翻 <code>03_高频考点速查.md</code>
+      <span class="when">👉 阶段三开始，每天10分钟</span>
+    </div>
+  </div>
+
+  <div class="todo-item">
+    <span class="badge later">后期</span>
+    <div class="todo-text">
+      <strong>考前押题/冲刺卷</strong>
+      <span class="when">👉 考前1个月（5月初）补购</span>
+    </div>
+  </div>
+
+  <div class="todo-item">
+    <span class="badge done">已完成</span>
+    <div class="todo-text" style="color:#999; text-decoration:line-through;">
+      分析2019-2025年真题规律 / 建立备考文件夹 / 公文Anki卡片(44张) / 确认备考策略 / 制定47天三阶段计划
+    </div>
+  </div>
+</div>
+
+<!-- 分值 & 性价比 -->
+<div class="section">
+  <div class="section-title">💰 各模块性价比（备考时间分配参考）</div>
+  <table class="score-table">
+    <tr>
+      <th>优先级</th><th>模块</th><th>分值</th><th>策略</th>
+    </tr>
+    <tr>
+      <td><span class="star">★★★</span></td>
+      <td>作文</td>
+      <td>40分</td>
+      <td>掌握结构套路，保25-30分；阶段二练1篇</td>
+    </tr>
+    <tr>
+      <td><span class="star">★★★</span></td>
+      <td>时政（近3个月）</td>
+      <td>~15分客观</td>
+      <td>必考送分，背了就得分</td>
+    </tr>
+    <tr>
+      <td><span class="star">★★★</span></td>
+      <td>法律案例</td>
+      <td>~10分客观</td>
+      <td>练应用，读案例→判断法律关系</td>
+    </tr>
+    <tr>
+      <td><span class="star">★★★</span></td>
+      <td>河南省情</td>
+      <td>~6分客观</td>
+      <td>联考特色，通用资料没有，必须专项背</td>
+    </tr>
+    <tr>
+      <td><span class="star">★★</span></td>
+      <td>改错（公文/病句）</td>
+      <td>10分</td>
+      <td>形式每年不同，两种都要练</td>
+    </tr>
+    <tr>
+      <td><span class="star">★★</span></td>
+      <td>马哲</td>
+      <td>~6分客观</td>
+      <td>框架已有Anki，练题感即可</td>
+    </tr>
+    <tr>
+      <td><span class="star">★</span></td>
+      <td>历史文化/科技</td>
+      <td>~8分客观</td>
+      <td>Anki保温，不专项刷</td>
+    </tr>
+  </table>
+
+  <div class="tip">
+    💡 <strong>关键认知</strong>：作文40分是全卷最大单项，但不需要追求满分。写满1000字、结构清晰、论点明确，稳拿25-28分。时政+法律+作文三项合计约65分，是得分核心。
+  </div>
+</div>
+
+<script>
+  function updateCountdown() {
+    const exam = new Date('2026-05-16T14:00:00');
+    const now = new Date();
+    const diff = Math.ceil((exam - now) / (1000 * 60 * 60 * 24));
+    document.getElementById('days').textContent = diff > 0 ? diff : 0;
+  }
+  updateCountdown();
+</script>
+
+</body>
+</html>
