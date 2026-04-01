@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anki 视觉注意力捕捉器</title>
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+  font-size: 13px;
+  background: #161616;
+  color: #ddd;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== TOOLBAR ===== */
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: #242424;
+  border-bottom: 1px solid #333;
+  padding: 8px 12px;
+  flex-shrink: 0;
+  min-height: 48px;
+}
+.tb-sep { width: 1px; height: 22px; background: #3a3a3a; flex-shrink: 0; }
+.tb-label { color: #777; white-space: nowrap; font-size: 12px; }
+
+/* Upload zone */
+#uploadZone {
+  border: 1.5px dashed #484848;
+  border-radius: 5px;
+  padding: 5px 12px;
+  cursor: pointer;
+  color: #999;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+#uploadZone:hover, #uploadZone.drag-over {
+  border-color: #4d9eff;
+  color: #4d9eff;
+  background: rgba(77,158,255,0.08);
+}
+#fileInput { display: none; }
+
+/* Marker size */
+#markerSizeRange { width: 70px; accent-color: #4d9eff; vertical-align: middle; }
+#sizeDisplay { color: #888; min-width: 28px; text-align: right; font-size: 12px; }
+
+/* Style radios */
+.style-radio-group { display: flex; gap: 10px; }
+.style-radio-group label {
+  display: flex; align-items: center; gap: 4px;
+  cursor: pointer; white-space: nowrap; color: #ccc;
+}
+.style-radio-group input[type=radio] { accent-color: #4d9eff; }
+
+/* Image ref input */
+#imgRefInput {
+  background: #1a1a1a;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  color: #ccc;
+  padding: 4px 8px;
+  width: 160px;
+  font-size: 12px;
+  outline: none;
+}
+#imgRefInput:focus { border-color: #4d9eff; }
+#imgRefInput::placeholder { color: #555; }
+
+/* Buttons */
+.btn {
+  padding: 5px 12px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.12s, opacity 0.12s;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.btn:active { opacity: 0.8; }
+.btn-ghost  { background: #323232; color: #bbb; }
+.btn-ghost:hover  { background: #3e3e3e; }
+.btn-red   { background: #9b2c2c; color: #fbb; }
+.btn-red:hover   { background: #b83232; }
+.btn-blue  { background: #1a5fa8; color: #aed4ff; }
+.btn-blue:hover  { background: #2070c8; }
+.btn-green { background: #175c2e; color: #7fe3a8; font-weight: 600; font-size: 13px; padding: 5px 16px; }
+.btn-green:hover { background: #1e7a3d; }
+
+/* Count badge */
+#countBadge {
+  background: #c0392b;
+  color: #fff;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: bold;
+  min-width: 24px;
+  text-align: center;
+}
+#countBadge.zero { background: #3a3a3a; color: #666; }
+
+/* ===== CANVAS AREA ===== */
+#canvasArea {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0e0e0e;
+  overflow: auto;
+  position: relative;
+  padding: 16px;
+}
+
+#dropHint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: #383838;
+  pointer-events: none;
+  user-select: none;
+}
+#dropHint .hint-icon { font-size: 56px; }
+#dropHint .hint-title { font-size: 18px; color: #454545; }
+#dropHint .hint-sub { font-size: 13px; color: #383838; }
+#dropHint .hint-kbd {
+  display: inline-block;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 12px;
+  font-family: monospace;
+  color: #555;
+}
+
+/* Image container — the core positioning context */
+#imageContainer {
+  position: relative;
+  display: inline-block;
+  line-height: 0;          /* removes inline gap below img */
+  cursor: crosshair;
+  user-select: none;
+  flex-shrink: 0;
+}
+#imageContainer img {
+  display: block;
+  max-width: min(100%, 1200px);
+  max-height: calc(100vh - 130px);
+  width: auto;
+  height: auto;
+  border-radius: 3px;
+  pointer-events: none;    /* clicks fall through to container */
+}
+
+/* Marker: Style A — breathing circle */
+.mk-dot {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+.mk-style-a {
+  border: 2.5px solid #ff3e3e;
+  box-shadow: 0 0 6px rgba(255,62,62,0.7), inset 0 0 5px rgba(255,62,62,0.15);
+  animation: breathe 1.6s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { transform: translate(-50%,-50%) scale(1);   opacity: 1;    }
+  50%       { transform: translate(-50%,-50%) scale(1.8); opacity: 0.18; }
+}
+
+/* Spotlight SVG overlay: Style B */
+.mk-spotlight-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: block;
+}
+
+/* Number badge */
+.mk-num {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(220, 40, 40, 0.92);
+  color: #fff;
+  font-size: 10px;
+  font-weight: bold;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  z-index: 10;
+  /* positioned by JS via style.left / style.top, already centered */
+  transform: translate(-50%, -50%);
+}
+
+/* ===== OUTPUT PANEL ===== */
+#outputPanel {
+  background: #1d1d1d;
+  border-top: 1px solid #2e2e2e;
+  padding: 10px 14px;
+  flex-shrink: 0;
+  display: none;
+}
+.out-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.out-block { display: flex; flex-direction: column; gap: 5px; }
+.out-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.out-title { font-size: 12px; color: #888; }
+.lang-tag {
+  background: #2e2e2e;
+  color: #777;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: monospace;
+}
+.out-block textarea {
+  background: #141414;
+  color: #8ecb8e;
+  border: 1px solid #2e2e2e;
+  border-radius: 4px;
+  padding: 7px 8px;
+  font-family: 'Consolas', 'Fira Code', monospace;
+  font-size: 11.5px;
+  resize: vertical;
+  height: 110px;
+  outline: none;
+  tab-size: 2;
+  line-height: 1.5;
+}
+.out-block textarea:focus { border-color: #444; }
+.copy-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.copied-flash { color: #5cb85c; font-size: 12px; opacity: 0; transition: opacity 0.2s; }
+.copied-flash.show { opacity: 1; }
+
+/* ===== STATUS TOAST ===== */
+#toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  background: rgba(30,30,30,0.96);
+  border: 1px solid #444;
+  color: #e0e0e0;
+  padding: 7px 18px;
+  border-radius: 20px;
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity 0.25s, transform 0.25s;
+  pointer-events: none;
+  z-index: 999;
+  white-space: nowrap;
+}
+#toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+</style>
+</head>
+<body>
+
+<!-- ===== TOOLBAR ===== -->
+<div id="toolbar">
+
+  <div id="uploadZone" onclick="document.getElementById('fileInput').click()" title="或拖拽 / Ctrl+V 粘贴">
+    📂 上传图片
+  </div>
+  <input type="file" id="fileInput" accept="image/*">
+
+  <div class="tb-sep"></div>
+
+  <span class="tb-label">标记大小</span>
+  <input type="range" id="markerSizeRange" min="16" max="120" value="44"
+    oninput="onSizeInput(this.value)">
+  <span id="sizeDisplay">44px</span>
+
+  <div class="tb-sep"></div>
+
+  <span class="tb-label">样式</span>
+  <div class="style-radio-group">
+    <label>
+      <input type="radio" name="styleChoice" value="A" checked onchange="onStyleChange('A')">
+      呼吸光圈
+    </label>
+    <label>
+      <input type="radio" name="styleChoice" value="B" onchange="onStyleChange('B')">
+      聚光灯遮罩
+    </label>
+  </div>
+
+  <div class="tb-sep"></div>
+
+  <span class="tb-label">图片引用</span>
+  <input type="text" id="imgRefInput" placeholder="{{图片}} 或 filename.jpg" value="{{图片}}">
+  <button class="btn btn-ghost" onclick="embedBase64()" title="将当前图片嵌入为 base64，自包含测试用">嵌入 base64</button>
+
+  <div class="tb-sep"></div>
+
+  <span class="tb-label">标记</span>
+  <span id="countBadge" class="zero">0</span>
+  <button class="btn btn-ghost" onclick="undoLast()" title="Ctrl+Z">↩ 撤销</button>
+  <button class="btn btn-red"   onclick="clearAll()">✕ 清除</button>
+  <button class="btn btn-green" onclick="generateCode()">⚡ 生成代码</button>
+
+</div>
+
+<!-- ===== CANVAS ===== -->
+<div id="canvasArea">
+  <div id="dropHint">
+    <div class="hint-icon">🖼️</div>
+    <div class="hint-title">拖拽图片到此处</div>
+    <div class="hint-sub">
+      或点击「上传图片」，或按 <span class="hint-kbd">Ctrl+V</span> 粘贴截图
+    </div>
+  </div>
+
+  <!-- 核心：position:relative 容器，图片 + 绝对定位标记均在此内 -->
+  <div id="imageContainer" style="display:none">
+    <img id="previewImg" src="" alt="">
+    <!-- .mk-dot 和 .mk-spotlight-svg 动态注入到此处 -->
+  </div>
+</div>
+
+<!-- ===== OUTPUT PANEL ===== -->
+<div id="outputPanel">
+  <div class="out-grid">
+    <div class="out-block">
+      <div class="out-header">
+        <span class="out-title">HTML — 粘贴到 Anki 卡片正面 / 背面</span>
+        <span class="lang-tag">HTML</span>
+      </div>
+      <textarea id="htmlOut" readonly spellcheck="false"></textarea>
+      <div class="copy-row">
+        <span class="copied-flash" id="htmlFlash">✓ 已复制</span>
+        <button class="btn btn-ghost" onclick="copyCode('htmlOut','htmlFlash')">复制 HTML</button>
+      </div>
+    </div>
+    <div class="out-block">
+      <div class="out-header">
+        <span class="out-title">CSS — 粘贴到 Anki「样式」栏（每副牌组只需一次）</span>
+        <span class="lang-tag">CSS</span>
+      </div>
+      <textarea id="cssOut" readonly spellcheck="false"></textarea>
+      <div class="copy-row">
+        <span class="copied-flash" id="cssFlash">✓ 已复制</span>
+        <button class="btn btn-ghost" onclick="copyCode('cssOut','cssFlash')">复制 CSS</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ================================================================
+// STATE
+// ================================================================
+const S = {
+  imageDataUrl : null,   // base64 DataURL
+  markers      : [],     // [{x: 30.5, y: 22.1}, ...]  百分比
+  style        : 'A',
+  markerSize   : 44      // px，用于预览和生成代码
+};
+
+// ================================================================
+// DOM REFS
+// ================================================================
+const $  = id => document.getElementById(id);
+const uploadZone    = $('uploadZone');
+const fileInput     = $('fileInput');
+const canvasArea    = $('canvasArea');
+const dropHint      = $('dropHint');
+const imageContainer= $('imageContainer');
+const previewImg    = $('previewImg');
+const outputPanel   = $('outputPanel');
+const countBadge    = $('countBadge');
+const markerSizeRange=$('markerSizeRange');
+const sizeDisplay   = $('sizeDisplay');
+const imgRefInput   = $('imgRefInput');
+
+// ================================================================
+// IMAGE LOADING
+// ================================================================
+function loadImage(file) {
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { toast('请选择图片文件'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    S.imageDataUrl = e.target.result;
+    S.markers = [];
+    previewImg.src = e.target.result;
+    dropHint.style.display = 'none';
+    imageContainer.style.display = 'inline-block';
+    outputPanel.style.display = 'none';
+    renderMarkers();
+    updateBadge();
+    toast('图片已加载，点击标记焦点位置');
+  };
+  reader.readAsDataURL(file);
+}
+
+// File input
+fileInput.addEventListener('change', e => loadImage(e.target.files[0]));
+
+// Paste (Ctrl+V)
+document.addEventListener('paste', e => {
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      loadImage(item.getAsFile());
+      e.preventDefault();
+      break;
+    }
+  }
+});
+
+// Drag & Drop onto canvas area
+canvasArea.addEventListener('dragover', e => {
+  e.preventDefault();
+  uploadZone.classList.add('drag-over');
+});
+canvasArea.addEventListener('dragleave', e => {
+  if (!canvasArea.contains(e.relatedTarget)) {
+    uploadZone.classList.remove('drag-over');
+  }
+});
+canvasArea.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files && e.dataTransfer.files[0];
+  loadImage(file);
+});
+
+// ================================================================
+// CLICK TO MARK
+// ================================================================
+imageContainer.addEventListener('click', e => {
+  if (!S.imageDataUrl) return;
+
+  // Use previewImg bounds so coords are always relative to the image pixels,
+  // even if imageContainer has fractional extra size.
+  const rect = previewImg.getBoundingClientRect();
+  const x = ((e.clientX - rect.left) / rect.width)  * 100;
+  const y = ((e.clientY - rect.top)  / rect.height) * 100;
+
+  // Clamp to [0, 100]
+  if (x < 0 || x > 100 || y < 0 || y > 100) return;
+
+  S.markers.push({ x: +x.toFixed(2), y: +y.toFixed(2) });
+  renderMarkers();
+  updateBadge();
+  toast(`#${S.markers.length}  (${x.toFixed(1)}%, ${y.toFixed(1)}%)`);
+});
+
+// ================================================================
+// RENDER MARKERS (preview inside the tool)
+// ================================================================
+function renderMarkers() {
+  // Clear all dynamic children (keep only the img)
+  [...imageContainer.children].forEach(el => {
+    if (el !== previewImg) el.remove();
+  });
+
+  if (S.markers.length === 0) return;
+
+  const r = S.markerSize;
+
+  if (S.style === 'A') {
+    // ---- Style A: Breathing circles ----
+    S.markers.forEach((m, i) => {
+      // Circle
+      const dot = document.createElement('div');
+      dot.className = 'mk-dot mk-style-a';
+      dot.style.cssText =
+        `left:${m.x}%;top:${m.y}%;width:${r}px;height:${r}px;`;
+      imageContainer.appendChild(dot);
+
+      // Number badge (offset to top-right of circle)
+      appendBadge(m, r, i + 1);
+    });
+
+  } else {
+    // ---- Style B: Spotlight SVG ----
+    const spotR = Math.max(12, Math.round(r * 0.75));
+    const circles = S.markers.map(m =>
+      `<circle cx="${m.x}%" cy="${m.y}%" r="${spotR}" fill="black"/>`
+    ).join('');
+
+    const ns  = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('class', 'mk-spotlight-svg');
+    svg.setAttribute('xmlns', ns);
+    // Using innerHTML for brevity — safe because we control content
+    svg.innerHTML =
+      `<defs><mask id="tool-smask">` +
+      `<rect width="100%" height="100%" fill="white"/>` +
+      circles +
+      `</mask></defs>` +
+      `<rect width="100%" height="100%" fill="rgba(0,0,0,0.72)" mask="url(#tool-smask)"/>`;
+    imageContainer.appendChild(svg);
+
+    S.markers.forEach((m, i) => appendBadge(m, spotR, i + 1));
+  }
+}
+
+function appendBadge(m, r, num) {
+  const badge = document.createElement('div');
+  badge.className = 'mk-num';
+  // Offset badge so it doesn't overlap the circle center
+  const offset = r / 2 + 2;
+  badge.style.cssText =
+    `left:calc(${m.x}% + ${offset}px);top:calc(${m.y}% - ${offset}px);`;
+  badge.textContent = num;
+  imageContainer.appendChild(badge);
+}
+
+// ================================================================
+// CONTROLS
+// ================================================================
+function onStyleChange(s) {
+  S.style = s;
+  renderMarkers();
+}
+
+function onSizeInput(v) {
+  S.markerSize = parseInt(v, 10);
+  sizeDisplay.textContent = v + 'px';
+  renderMarkers();
+}
+
+function undoLast() {
+  if (S.markers.length === 0) { toast('没有可撤销的标记'); return; }
+  S.markers.pop();
+  renderMarkers();
+  updateBadge();
+  toast('已撤销最后一个标记');
+}
+
+function clearAll() {
+  if (S.markers.length === 0) return;
+  S.markers = [];
+  renderMarkers();
+  updateBadge();
+  outputPanel.style.display = 'none';
+  toast('已清除所有标记');
+}
+
+function updateBadge() {
+  const n = S.markers.length;
+  countBadge.textContent = n;
+  countBadge.className = n === 0 ? 'zero' : '';
+}
+
+// Ctrl+Z shortcut
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    undoLast();
+  }
+});
+
+// ================================================================
+// CODE GENERATION
+// ================================================================
+function generateCode() {
+  if (!S.imageDataUrl) { toast('请先上传图片！'); return; }
+  if (S.markers.length === 0) { toast('请先点击图片添加至少一个标记！'); return; }
+
+  const imgSrc = imgRefInput.value.trim() || 'YOUR_IMAGE.jpg';
+  const r = S.markerSize;
+
+  let html, css;
+
+  if (S.style === 'A') {
+    /* ---- Style A: Breathing circles ---- */
+    const marks = S.markers.map(m =>
+      `  <div class="anki-mark" style="left:${m.x}%;top:${m.y}%"></div>`
+    ).join('\n');
+
+    html =
+`<div class="anki-wrap">
+  <img class="anki-img" src="${imgSrc}">
+${marks}
+</div>`;
+
+    css =
+`/* ── Anki 视觉焦点：呼吸光圈 ── */
+.anki-wrap {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+}
+.anki-img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.anki-mark {
+  position: absolute;
+  width: ${r}px;
+  height: ${r}px;
+  margin-left: -${r/2}px;
+  margin-top: -${r/2}px;
+  border-radius: 50%;
+  border: 2.5px solid #ff3e3e;
+  box-shadow: 0 0 8px rgba(255,62,62,0.75);
+  animation: ankiBreathe 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes ankiBreathe {
+  0%, 100% { transform: scale(1);   opacity: 1;    }
+  50%       { transform: scale(1.8); opacity: 0.18; }
+}`;
+
+  } else {
+    /* ---- Style B: Spotlight mask ---- */
+    const spotR = Math.max(12, Math.round(r * 0.75));
+
+    const circles = S.markers.map(m =>
+      `      <circle cx="${m.x}%" cy="${m.y}%" r="${spotR}" fill="black"/>`
+    ).join('\n');
+
+    html =
+`<div class="anki-wrap">
+  <img class="anki-img" src="${imgSrc}">
+  <svg class="anki-spot" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <mask id="anki-smask">
+        <rect width="100%" height="100%" fill="white"/>
+${circles}
+      </mask>
+    </defs>
+    <rect width="100%" height="100%"
+          fill="rgba(0,0,0,0.72)"
+          mask="url(#anki-smask)"/>
+  </svg>
+</div>`;
+
+    css =
+`/* ── Anki 视觉焦点：聚光灯遮罩 ── */
+.anki-wrap {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+}
+.anki-img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.anki-spot {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}`;
+  }
+
+  $('htmlOut').value = html;
+  $('cssOut').value  = css;
+  outputPanel.style.display = 'block';
+  outputPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  toast('代码已生成！将图片引用替换为实际路径');
+}
+
+// Embed base64 into the img ref field
+function embedBase64() {
+  if (!S.imageDataUrl) { toast('请先上传图片！'); return; }
+  imgRefInput.value = S.imageDataUrl;
+  toast('已设置为 base64（自包含，仅用于临时测试）');
+}
+
+// ================================================================
+// COPY
+// ================================================================
+function copyCode(textareaId, flashId) {
+  const ta = $(textareaId);
+  if (!ta.value) { toast('没有可复制的内容'); return; }
+  // Modern API first, fallback to execCommand
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(ta.value).then(() => showFlash(flashId));
+  } else {
+    ta.select();
+    document.execCommand('copy');
+    showFlash(flashId);
+  }
+}
+
+function showFlash(id) {
+  const el = $(id);
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 1800);
+  toast('已复制到剪贴板');
+}
+
+// ================================================================
+// TOAST
+// ================================================================
+let toastTimer;
+function toast(msg) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+}
+</script>
+</body>
+</html>
