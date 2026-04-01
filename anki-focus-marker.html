@@ -62,20 +62,6 @@ body {
 }
 .style-radio-group input[type=radio] { accent-color: #4d9eff; }
 
-/* Image ref input */
-#imgRefInput {
-  background: #1a1a1a;
-  border: 1px solid #3a3a3a;
-  border-radius: 4px;
-  color: #ccc;
-  padding: 4px 8px;
-  width: 160px;
-  font-size: 12px;
-  outline: none;
-}
-#imgRefInput:focus { border-color: #4d9eff; }
-#imgRefInput::placeholder { color: #555; }
-
 /* Buttons */
 .btn {
   padding: 5px 12px;
@@ -320,12 +306,6 @@ body {
 
   <div class="tb-sep"></div>
 
-  <span class="tb-label">图片引用</span>
-  <input type="text" id="imgRefInput" placeholder="{{图片}} 或 filename.jpg" value="{{图片}}">
-  <button class="btn btn-ghost" onclick="embedBase64()" title="将当前图片嵌入为 base64，自包含测试用">嵌入 base64</button>
-
-  <div class="tb-sep"></div>
-
   <span class="tb-label">标记</span>
   <span id="countBadge" class="zero">0</span>
   <button class="btn btn-ghost" onclick="undoLast()" title="Ctrl+Z">↩ 撤销</button>
@@ -409,7 +389,6 @@ const outputPanel   = $('outputPanel');
 const countBadge    = $('countBadge');
 const markerSizeRange=$('markerSizeRange');
 const sizeDisplay   = $('sizeDisplay');
-const imgRefInput   = $('imgRefInput');
 
 // ================================================================
 // IMAGE LOADING
@@ -600,7 +579,7 @@ function generateCode() {
   if (!S.imageDataUrl) { toast('请先上传图片！'); return; }
   if (S.markers.length === 0) { toast('请先点击图片添加至少一个标记！'); return; }
 
-  const imgSrc = imgRefInput.value.trim() || 'YOUR_IMAGE.jpg';
+  const imgSrc = S.imageDataUrl;
   const r = S.markerSize;
 
   let html, css;
@@ -697,14 +676,7 @@ ${circles}
   $('cssOut').value  = css;
   outputPanel.style.display = 'block';
   outputPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  toast('代码已生成！将图片引用替换为实际路径');
-}
-
-// Embed base64 into the img ref field
-function embedBase64() {
-  if (!S.imageDataUrl) { toast('请先上传图片！'); return; }
-  imgRefInput.value = S.imageDataUrl;
-  toast('已设置为 base64（自包含，仅用于临时测试）');
+  toast('代码已生成！图片已内嵌为 base64，可直接粘贴使用');
 }
 
 // ================================================================
