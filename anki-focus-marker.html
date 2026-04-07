@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Anki 视觉注意力捕捉器</title>
 <style>
-/* ===== RESET & BASE ===== */
+/* ===== RESET ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
@@ -25,182 +25,244 @@ body {
   gap: 8px;
   flex-wrap: wrap;
   background: #242424;
-  border-bottom: 1px solid #333;
-  padding: 8px 12px;
+  border-bottom: 1px solid #2e2e2e;
+  padding: 7px 12px;
   flex-shrink: 0;
-  min-height: 48px;
+  min-height: 46px;
 }
-.tb-sep { width: 1px; height: 22px; background: #3a3a3a; flex-shrink: 0; }
-.tb-label { color: #777; white-space: nowrap; font-size: 12px; }
+.tb-sep   { width: 1px; height: 20px; background: #383838; flex-shrink: 0; }
+.tb-label { color: #666; white-space: nowrap; font-size: 12px; }
 
-/* Upload zone */
+/* Upload */
 #uploadZone {
-  border: 1.5px dashed #484848;
+  border: 1.5px dashed #464646;
   border-radius: 5px;
-  padding: 5px 12px;
+  padding: 4px 11px;
   cursor: pointer;
   color: #999;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
   white-space: nowrap;
+  font-size: 12px;
 }
 #uploadZone:hover, #uploadZone.drag-over {
-  border-color: #4d9eff;
-  color: #4d9eff;
+  border-color: #4d9eff; color: #4d9eff;
   background: rgba(77,158,255,0.08);
 }
 #fileInput { display: none; }
 
-/* Marker size */
-#markerSizeRange { width: 70px; accent-color: #4d9eff; vertical-align: middle; }
-#sizeDisplay { color: #888; min-width: 28px; text-align: right; font-size: 12px; }
+/* Tool selector */
+.tool-group {
+  display: flex;
+  border: 1px solid #363636;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.tool-btn {
+  padding: 4px 10px;
+  border: none;
+  border-right: 1px solid #363636;
+  cursor: pointer;
+  background: #2a2a2a;
+  color: #888;
+  font-size: 12px;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+.tool-btn:last-child { border-right: none; }
+.tool-btn.active { background: #1a5296; color: #9ec9ff; }
+.tool-btn:hover:not(.active) { background: #333; color: #bbb; }
+
+/* Opts groups */
+.opts-group { display: flex; align-items: center; gap: 7px; }
+
+/* Sliders */
+input[type=range] { width: 68px; accent-color: #4d9eff; vertical-align: middle; }
+.val-display { color: #888; font-size: 12px; min-width: 26px; }
 
 /* Style radios */
 .style-radio-group { display: flex; gap: 10px; }
 .style-radio-group label {
   display: flex; align-items: center; gap: 4px;
-  cursor: pointer; white-space: nowrap; color: #ccc;
+  cursor: pointer; white-space: nowrap; color: #ccc; font-size: 12px;
 }
 .style-radio-group input[type=radio] { accent-color: #4d9eff; }
 
+/* Checkbox */
+.cb-label {
+  display: flex; align-items: center; gap: 4px;
+  cursor: pointer; white-space: nowrap; color: #ccc; font-size: 12px;
+}
+.cb-label input[type=checkbox] { accent-color: #4d9eff; }
+
+/* Color picker */
+.color-swatch {
+  width: 26px; height: 20px;
+  border: 1px solid #555; border-radius: 4px;
+  overflow: hidden; cursor: pointer; display: inline-block;
+  flex-shrink: 0;
+}
+.color-swatch input[type=color] {
+  width: 150%; height: 150%;
+  margin: -25% 0 0 -25%;
+  border: none; padding: 0; cursor: pointer;
+}
+
 /* Buttons */
 .btn {
-  padding: 5px 12px;
-  border-radius: 5px;
-  border: none;
-  cursor: pointer;
-  font-size: 12px;
+  padding: 4px 11px; border-radius: 5px; border: none;
+  cursor: pointer; font-size: 12px;
   transition: background 0.12s, opacity 0.12s;
-  white-space: nowrap;
-  line-height: 1.4;
+  white-space: nowrap; line-height: 1.5;
 }
-.btn:active { opacity: 0.8; }
-.btn-ghost  { background: #323232; color: #bbb; }
-.btn-ghost:hover  { background: #3e3e3e; }
-.btn-red   { background: #9b2c2c; color: #fbb; }
-.btn-red:hover   { background: #b83232; }
-.btn-blue  { background: #1a5fa8; color: #aed4ff; }
-.btn-blue:hover  { background: #2070c8; }
-.btn-green { background: #175c2e; color: #7fe3a8; font-weight: 600; font-size: 13px; padding: 5px 16px; }
-.btn-green:hover { background: #1e7a3d; }
+.btn:active { opacity: 0.75; }
+.btn-ghost { background: #303030; color: #bbb; }
+.btn-ghost:hover { background: #3c3c3c; }
+.btn-red   { background: #892020; color: #f9aaaa; }
+.btn-red:hover   { background: #a82828; }
+.btn-green { background: #14532d; color: #6ee7a4; font-weight: 600; font-size: 13px; padding: 4px 14px; }
+.btn-green:hover { background: #1a6e3a; }
 
 /* Count badge */
 #countBadge {
-  background: #c0392b;
-  color: #fff;
-  border-radius: 10px;
-  padding: 2px 8px;
-  font-size: 12px;
-  font-weight: bold;
-  min-width: 24px;
-  text-align: center;
+  background: #c0392b; color: #fff;
+  border-radius: 10px; padding: 1px 7px;
+  font-size: 12px; font-weight: bold;
+  min-width: 22px; text-align: center;
 }
-#countBadge.zero { background: #3a3a3a; color: #666; }
+#countBadge.zero { background: #333; color: #555; }
 
-/* ===== CANVAS AREA ===== */
+/* ===== CANVAS ===== */
 #canvasArea {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #0e0e0e;
-  overflow: auto;
-  position: relative;
-  padding: 16px;
+  display: flex; align-items: center; justify-content: center;
+  background: #0d0d0d;
+  overflow: auto; position: relative; padding: 16px;
 }
 
 #dropHint {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  color: #383838;
-  pointer-events: none;
-  user-select: none;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  color: #363636; pointer-events: none; user-select: none;
 }
-#dropHint .hint-icon { font-size: 56px; }
-#dropHint .hint-title { font-size: 18px; color: #454545; }
-#dropHint .hint-sub { font-size: 13px; color: #383838; }
-#dropHint .hint-kbd {
-  display: inline-block;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
-  border-radius: 4px;
-  padding: 1px 6px;
-  font-size: 12px;
-  font-family: monospace;
-  color: #555;
+#dropHint .hint-icon  { font-size: 52px; }
+#dropHint .hint-title { font-size: 17px; color: #424242; }
+#dropHint .hint-sub   { font-size: 12px; color: #363636; }
+#dropHint .kbd {
+  display: inline-block; background: #222; border: 1px solid #333;
+  border-radius: 3px; padding: 1px 5px; font-size: 11px;
+  font-family: monospace; color: #505050;
 }
 
-/* Image container — the core positioning context */
+/* Image container — the single positioning context */
 #imageContainer {
   position: relative;
   display: inline-block;
-  line-height: 0;          /* removes inline gap below img */
-  cursor: crosshair;
+  line-height: 0;
   user-select: none;
   flex-shrink: 0;
 }
 #imageContainer img {
   display: block;
   max-width: min(100%, 1200px);
-  max-height: calc(100vh - 130px);
-  width: auto;
-  height: auto;
-  border-radius: 3px;
-  pointer-events: none;    /* clicks fall through to container */
+  max-height: calc(100vh - 140px);
+  width: auto; height: auto;
+  border-radius: 2px;
+  pointer-events: none;
 }
 
-/* Marker: Style A — breathing circle */
-.mk-dot {
+/* Cursor per tool — applied to container via JS */
+#imageContainer.cur-marker { cursor: crosshair; }
+#imageContainer.cur-text   { cursor: text; }
+#imageContainer.cur-rect   { cursor: crosshair; }
+
+/* ── Marker A: breathing circle ── */
+.mk-circle {
   position: absolute;
   border-radius: 50%;
   pointer-events: none;
   transform: translate(-50%, -50%);
-}
-.mk-style-a {
   border: 2.5px solid #ff3e3e;
-  box-shadow: 0 0 6px rgba(255,62,62,0.7), inset 0 0 5px rgba(255,62,62,0.15);
-  animation: breathe 1.6s ease-in-out infinite;
+  box-shadow: 0 0 6px rgba(255,62,62,0.65), inset 0 0 4px rgba(255,62,62,0.15);
+  animation: toolBreathe 1.6s ease-in-out infinite;
 }
-@keyframes breathe {
+@keyframes toolBreathe {
   0%, 100% { transform: translate(-50%,-50%) scale(1);   opacity: 1;    }
   50%       { transform: translate(-50%,-50%) scale(1.8); opacity: 0.18; }
 }
 
-/* Spotlight SVG overlay: Style B */
-.mk-spotlight-svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  display: block;
+/* ── Marker B: spotlight SVG ── */
+.mk-spotlight {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none; display: block;
+  z-index: 1;
 }
 
-/* Number badge */
+/* ── Text label ── */
+.mk-text {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 3;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 8px rgba(0,0,0,0.7);
+  line-height: 1.2;
+}
+
+/* ── Rect ── */
+.mk-rect {
+  position: absolute;
+  border-style: solid;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* ── Rect drag preview ── */
+#rectPreview {
+  position: absolute;
+  border-style: dashed;
+  pointer-events: none;
+  z-index: 15;
+  display: none;
+  opacity: 0.85;
+}
+
+/* ── Number badge ── */
 .mk-num {
   position: absolute;
   pointer-events: none;
-  background: rgba(220, 40, 40, 0.92);
-  color: #fff;
-  font-size: 10px;
-  font-weight: bold;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
+  background: rgba(210,35,35,0.88);
+  color: #fff; font-size: 10px; font-weight: bold;
+  width: 15px; height: 15px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
   z-index: 10;
-  /* positioned by JS via style.left / style.top, already centered */
+  transform: translate(-50%, -50%);
+  line-height: 1;
+}
+
+/* ── Text input overlay ── */
+#textInputWrap {
+  position: absolute;
+  z-index: 20;
+  display: none;
   transform: translate(-50%, -50%);
 }
+#textInputField {
+  background: rgba(10,10,10,0.88);
+  border: 1.5px solid #4d9eff;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 14px;
+  padding: 4px 8px;
+  outline: none;
+  min-width: 100px;
+  font-family: inherit;
+}
+#textInputField::placeholder { color: #555; }
 
 /* ===== OUTPUT PANEL ===== */
 #outputPanel {
-  background: #1d1d1d;
-  border-top: 1px solid #2e2e2e;
+  background: #1c1c1c;
+  border-top: 1px solid #2a2a2a;
   padding: 10px 14px;
   flex-shrink: 0;
   display: none;
@@ -212,65 +274,39 @@ body {
 }
 .out-block { display: flex; flex-direction: column; gap: 5px; }
 .out-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: flex; justify-content: space-between; align-items: center;
 }
-.out-title { font-size: 12px; color: #888; }
+.out-title { font-size: 12px; color: #777; }
 .lang-tag {
-  background: #2e2e2e;
-  color: #777;
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 3px;
+  background: #2c2c2c; color: #666;
+  font-size: 10px; padding: 1px 6px; border-radius: 3px;
   font-family: monospace;
 }
 .out-block textarea {
-  background: #141414;
-  color: #8ecb8e;
-  border: 1px solid #2e2e2e;
-  border-radius: 4px;
+  background: #111; color: #85c885;
+  border: 1px solid #2a2a2a; border-radius: 4px;
   padding: 7px 8px;
   font-family: 'Consolas', 'Fira Code', monospace;
-  font-size: 11.5px;
-  resize: vertical;
-  height: 110px;
-  outline: none;
-  tab-size: 2;
-  line-height: 1.5;
+  font-size: 11.5px; resize: vertical; height: 108px;
+  outline: none; line-height: 1.5;
 }
-.out-block textarea:focus { border-color: #444; }
+.out-block textarea:focus { border-color: #3e3e3e; }
 .copy-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: flex-end;
+  display: flex; align-items: center; gap: 8px; justify-content: flex-end;
 }
-.copied-flash { color: #5cb85c; font-size: 12px; opacity: 0; transition: opacity 0.2s; }
+.copied-flash { color: #4caf79; font-size: 12px; opacity: 0; transition: opacity 0.2s; }
 .copied-flash.show { opacity: 1; }
 
-/* ===== STATUS TOAST ===== */
+/* ===== TOAST ===== */
 #toast {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
+  position: fixed; bottom: 18px; left: 50%;
   transform: translateX(-50%) translateY(8px);
-  background: rgba(30,30,30,0.96);
-  border: 1px solid #444;
-  color: #e0e0e0;
-  padding: 7px 18px;
-  border-radius: 20px;
-  font-size: 13px;
-  opacity: 0;
-  transition: opacity 0.25s, transform 0.25s;
-  pointer-events: none;
-  z-index: 999;
-  white-space: nowrap;
+  background: rgba(28,28,28,0.96); border: 1px solid #3e3e3e;
+  color: #ddd; padding: 6px 16px; border-radius: 20px;
+  font-size: 12px; opacity: 0; transition: opacity 0.22s, transform 0.22s;
+  pointer-events: none; z-index: 999; white-space: nowrap;
 }
-#toast.show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
 </head>
 <body>
@@ -278,35 +314,73 @@ body {
 <!-- ===== TOOLBAR ===== -->
 <div id="toolbar">
 
-  <div id="uploadZone" onclick="document.getElementById('fileInput').click()" title="或拖拽 / Ctrl+V 粘贴">
+  <!-- Upload -->
+  <div id="uploadZone" onclick="document.getElementById('fileInput').click()" title="拖拽 / Ctrl+V 粘贴">
     📂 上传图片
   </div>
   <input type="file" id="fileInput" accept="image/*">
 
   <div class="tb-sep"></div>
 
-  <span class="tb-label">标记大小</span>
-  <input type="range" id="markerSizeRange" min="16" max="120" value="44"
-    oninput="onSizeInput(this.value)">
-  <span id="sizeDisplay">44px</span>
+  <!-- Tool selector -->
+  <div class="tool-group">
+    <button class="tool-btn active" data-tool="marker" onclick="setTool('marker')">🎯 焦点圈</button>
+    <button class="tool-btn" data-tool="text"   onclick="setTool('text')">📝 文字</button>
+    <button class="tool-btn" data-tool="rect"   onclick="setTool('rect')">⬜ 矩形</button>
+  </div>
 
   <div class="tb-sep"></div>
 
-  <span class="tb-label">样式</span>
-  <div class="style-radio-group">
-    <label>
-      <input type="radio" name="styleChoice" value="A" checked onchange="onStyleChange('A')">
-      呼吸光圈
+  <!-- Marker options -->
+  <div id="opts-marker" class="opts-group">
+    <span class="tb-label">样式</span>
+    <div class="style-radio-group">
+      <label><input type="radio" name="styleChoice" value="A" checked onchange="onStyleChange('A')"> 呼吸圈</label>
+      <label><input type="radio" name="styleChoice" value="B" onchange="onStyleChange('B')"> 聚光灯</label>
+    </div>
+    <span class="tb-label">大小</span>
+    <input type="range" id="markerSizeRange" min="16" max="120" value="44" oninput="onMarkerSize(this.value)">
+    <span id="markerSizeVal" class="val-display">44px</span>
+  </div>
+
+  <!-- Text options -->
+  <div id="opts-text" class="opts-group" style="display:none">
+    <span class="tb-label">字号</span>
+    <input type="range" id="textSizeRange" min="10" max="52" value="18" oninput="onTextSize(this.value)">
+    <span id="textSizeVal" class="val-display">18px</span>
+    <label class="cb-label">
+      <input type="checkbox" id="textBold" checked onchange="S.textBold = this.checked">
+      粗体
     </label>
-    <label>
-      <input type="radio" name="styleChoice" value="B" onchange="onStyleChange('B')">
-      聚光灯遮罩
+    <label class="cb-label">
+      <input type="checkbox" id="textShadow" checked onchange="S.textShadow = this.checked">
+      描边
+    </label>
+  </div>
+
+  <!-- Rect options -->
+  <div id="opts-rect" class="opts-group" style="display:none">
+    <span class="tb-label">线宽</span>
+    <input type="range" id="rectWidthRange" min="1" max="8" value="2" oninput="onRectWidth(this.value)">
+    <span id="rectWidthVal" class="val-display">2px</span>
+    <label class="cb-label">
+      <input type="checkbox" id="rectFill" onchange="S.rectFill = this.checked">
+      填充
     </label>
   </div>
 
   <div class="tb-sep"></div>
 
-  <span class="tb-label">标记</span>
+  <!-- Color -->
+  <span class="tb-label">颜色</span>
+  <label class="color-swatch" title="选择标注颜色">
+    <input type="color" id="colorPicker" value="#ff3e3e" oninput="S.color = this.value">
+  </label>
+
+  <div class="tb-sep"></div>
+
+  <!-- Actions -->
+  <span class="tb-label">标注</span>
   <span id="countBadge" class="zero">0</span>
   <button class="btn btn-ghost" onclick="undoLast()" title="Ctrl+Z">↩ 撤销</button>
   <button class="btn btn-red"   onclick="clearAll()">✕ 清除</button>
@@ -320,14 +394,17 @@ body {
     <div class="hint-icon">🖼️</div>
     <div class="hint-title">拖拽图片到此处</div>
     <div class="hint-sub">
-      或点击「上传图片」，或按 <span class="hint-kbd">Ctrl+V</span> 粘贴截图
+      或点击「上传图片」，或按 <span class="kbd">Ctrl+V</span> 粘贴截图
     </div>
   </div>
 
-  <!-- 核心：position:relative 容器，图片 + 绝对定位标记均在此内 -->
-  <div id="imageContainer" style="display:none">
+  <div id="imageContainer" class="cur-marker" style="display:none">
     <img id="previewImg" src="" alt="">
-    <!-- .mk-dot 和 .mk-spotlight-svg 动态注入到此处 -->
+    <!-- transient overlays injected by JS -->
+    <div id="rectPreview"></div>
+    <div id="textInputWrap">
+      <input type="text" id="textInputField" placeholder="输入文字，Enter 确认">
+    </div>
   </div>
 </div>
 
@@ -347,7 +424,7 @@ body {
     </div>
     <div class="out-block">
       <div class="out-header">
-        <span class="out-title">CSS — 粘贴到 Anki「样式」栏（每副牌组只需一次）</span>
+        <span class="out-title">CSS — 粘贴到「样式」栏（每副牌组只需一次）</span>
         <span class="lang-tag">CSS</span>
       </div>
       <textarea id="cssOut" readonly spellcheck="false"></textarea>
@@ -359,7 +436,6 @@ body {
   </div>
 </div>
 
-<!-- Toast -->
 <div id="toast"></div>
 
 <script>
@@ -369,26 +445,38 @@ body {
 // STATE
 // ================================================================
 const S = {
-  imageDataUrl : null,   // base64 DataURL
-  markers      : [],     // [{x: 30.5, y: 22.1}, ...]  百分比
-  style        : 'A',
-  markerSize   : 44      // px，用于预览和生成代码
+  imageDataUrl  : null,
+  annotations   : [],   // mixed: {type, ...props}
+  tool          : 'marker',
+  // marker
+  style         : 'A',
+  markerSize    : 44,
+  // text
+  textSize      : 18,
+  textBold      : true,
+  textShadow    : true,
+  // rect
+  rectBorderWidth: 2,
+  rectFill      : false,
+  // shared
+  color         : '#ff3e3e',
 };
 
 // ================================================================
 // DOM REFS
 // ================================================================
-const $  = id => document.getElementById(id);
-const uploadZone    = $('uploadZone');
-const fileInput     = $('fileInput');
-const canvasArea    = $('canvasArea');
-const dropHint      = $('dropHint');
-const imageContainer= $('imageContainer');
-const previewImg    = $('previewImg');
-const outputPanel   = $('outputPanel');
-const countBadge    = $('countBadge');
-const markerSizeRange=$('markerSizeRange');
-const sizeDisplay   = $('sizeDisplay');
+const $ = id => document.getElementById(id);
+const uploadZone     = $('uploadZone');
+const fileInput      = $('fileInput');
+const canvasArea     = $('canvasArea');
+const dropHint       = $('dropHint');
+const imageContainer = $('imageContainer');
+const previewImg     = $('previewImg');
+const outputPanel    = $('outputPanel');
+const countBadge     = $('countBadge');
+const rectPreview    = $('rectPreview');
+const textInputWrap  = $('textInputWrap');
+const textInputField = $('textInputField');
 
 // ================================================================
 // IMAGE LOADING
@@ -399,22 +487,20 @@ function loadImage(file) {
   const reader = new FileReader();
   reader.onload = e => {
     S.imageDataUrl = e.target.result;
-    S.markers = [];
+    S.annotations  = [];
     previewImg.src = e.target.result;
     dropHint.style.display = 'none';
     imageContainer.style.display = 'inline-block';
     outputPanel.style.display = 'none';
-    renderMarkers();
+    renderAnnotations();
     updateBadge();
     toast('图片已加载，点击标记焦点位置');
   };
   reader.readAsDataURL(file);
 }
 
-// File input
 fileInput.addEventListener('change', e => loadImage(e.target.files[0]));
 
-// Paste (Ctrl+V)
 document.addEventListener('paste', e => {
   const items = e.clipboardData && e.clipboardData.items;
   if (!items) return;
@@ -427,146 +513,297 @@ document.addEventListener('paste', e => {
   }
 });
 
-// Drag & Drop onto canvas area
 canvasArea.addEventListener('dragover', e => {
   e.preventDefault();
   uploadZone.classList.add('drag-over');
 });
 canvasArea.addEventListener('dragleave', e => {
-  if (!canvasArea.contains(e.relatedTarget)) {
-    uploadZone.classList.remove('drag-over');
-  }
+  if (!canvasArea.contains(e.relatedTarget)) uploadZone.classList.remove('drag-over');
 });
 canvasArea.addEventListener('drop', e => {
   e.preventDefault();
   uploadZone.classList.remove('drag-over');
-  const file = e.dataTransfer.files && e.dataTransfer.files[0];
-  loadImage(file);
+  loadImage(e.dataTransfer.files && e.dataTransfer.files[0]);
 });
 
 // ================================================================
-// CLICK TO MARK
+// COORDINATE HELPER
 // ================================================================
-imageContainer.addEventListener('click', e => {
-  if (!S.imageDataUrl) return;
-
-  // Use previewImg bounds so coords are always relative to the image pixels,
-  // even if imageContainer has fractional extra size.
+function getRelPos(e) {
   const rect = previewImg.getBoundingClientRect();
   const x = ((e.clientX - rect.left) / rect.width)  * 100;
   const y = ((e.clientY - rect.top)  / rect.height) * 100;
+  return {
+    x: +Math.max(0, Math.min(100, x)).toFixed(2),
+    y: +Math.max(0, Math.min(100, y)).toFixed(2),
+  };
+}
 
-  // Clamp to [0, 100]
-  if (x < 0 || x > 100 || y < 0 || y > 100) return;
+// ================================================================
+// RECT DRAG
+// ================================================================
+let rectDrag = null;      // {startX, startY}
+let suppressClick = false;
 
-  S.markers.push({ x: +x.toFixed(2), y: +y.toFixed(2) });
-  renderMarkers();
-  updateBadge();
-  toast(`#${S.markers.length}  (${x.toFixed(1)}%, ${y.toFixed(1)}%)`);
+imageContainer.addEventListener('mousedown', e => {
+  if (S.tool !== 'rect' || !S.imageDataUrl) return;
+  e.preventDefault();
+  const pos = getRelPos(e);
+  rectDrag = { startX: pos.x, startY: pos.y };
+  updateRectPreview(pos.x, pos.y, pos.x, pos.y, true);
+});
+
+document.addEventListener('mousemove', e => {
+  if (!rectDrag) return;
+  const pos = getRelPos(e);
+  updateRectPreview(rectDrag.startX, rectDrag.startY, pos.x, pos.y, true);
+});
+
+document.addEventListener('mouseup', e => {
+  if (!rectDrag) return;
+  const pos = getRelPos(e);
+  const x1 = Math.min(rectDrag.startX, pos.x);
+  const y1 = Math.min(rectDrag.startY, pos.y);
+  const x2 = Math.max(rectDrag.startX, pos.x);
+  const y2 = Math.max(rectDrag.startY, pos.y);
+
+  rectPreview.style.display = 'none';
+  rectDrag = null;
+
+  // Commit only if meaningful size (>1% in at least one axis)
+  if (x2 - x1 > 0.8 || y2 - y1 > 0.8) {
+    S.annotations.push({
+      type: 'rect', x1, y1, x2, y2,
+      color: S.color, borderWidth: S.rectBorderWidth, fill: S.rectFill,
+    });
+    renderAnnotations();
+    updateBadge();
+    suppressClick = true;
+    setTimeout(() => suppressClick = false, 80);
+    toast('矩形已添加');
+  }
+});
+
+function updateRectPreview(x1, y1, x2, y2, show) {
+  const lx = Math.min(x1, x2), rx = Math.max(x1, x2);
+  const ty = Math.min(y1, y2), by = Math.max(y1, y2);
+  Object.assign(rectPreview.style, {
+    display     : show ? 'block' : 'none',
+    left        : lx + '%',
+    top         : ty + '%',
+    width       : (rx - lx) + '%',
+    height      : (by - ty) + '%',
+    borderColor : S.color,
+    borderWidth : S.rectBorderWidth + 'px',
+    background  : S.rectFill ? hexToRgba(S.color, 0.18) : 'transparent',
+  });
+}
+
+// ================================================================
+// CLICK  → marker / text
+// ================================================================
+imageContainer.addEventListener('click', e => {
+  if (suppressClick || !S.imageDataUrl) return;
+  const pos = getRelPos(e);
+
+  if (S.tool === 'marker') {
+    S.annotations.push({ type: 'marker', x: pos.x, y: pos.y });
+    renderAnnotations();
+    updateBadge();
+    const n = S.annotations.filter(a => a.type === 'marker').length;
+    toast(`焦点圈 #${n}  (${pos.x}%, ${pos.y}%)`);
+
+  } else if (S.tool === 'text') {
+    openTextInput(pos.x, pos.y);
+  }
 });
 
 // ================================================================
-// RENDER MARKERS (preview inside the tool)
+// TEXT INPUT
 // ================================================================
-function renderMarkers() {
-  // Clear all dynamic children (keep only the img)
-  [...imageContainer.children].forEach(el => {
-    if (el !== previewImg) el.remove();
-  });
+let pendingPos = null;
 
-  if (S.markers.length === 0) return;
-
-  const r = S.markerSize;
-
-  if (S.style === 'A') {
-    // ---- Style A: Breathing circles ----
-    S.markers.forEach((m, i) => {
-      // Circle
-      const dot = document.createElement('div');
-      dot.className = 'mk-dot mk-style-a';
-      dot.style.cssText =
-        `left:${m.x}%;top:${m.y}%;width:${r}px;height:${r}px;`;
-      imageContainer.appendChild(dot);
-
-      // Number badge (offset to top-right of circle)
-      appendBadge(m, r, i + 1);
-    });
-
-  } else {
-    // ---- Style B: Spotlight SVG ----
-    const spotR = Math.max(12, Math.round(r * 0.75));
-    const circles = S.markers.map(m =>
-      `<circle cx="${m.x}%" cy="${m.y}%" r="${spotR}" fill="black"/>`
-    ).join('');
-
-    const ns  = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(ns, 'svg');
-    svg.setAttribute('class', 'mk-spotlight-svg');
-    svg.setAttribute('xmlns', ns);
-    // Using innerHTML for brevity — safe because we control content
-    svg.innerHTML =
-      `<defs><mask id="tool-smask">` +
-      `<rect width="100%" height="100%" fill="white"/>` +
-      circles +
-      `</mask></defs>` +
-      `<rect width="100%" height="100%" fill="rgba(0,0,0,0.72)" mask="url(#tool-smask)"/>`;
-    imageContainer.appendChild(svg);
-
-    S.markers.forEach((m, i) => appendBadge(m, spotR, i + 1));
-  }
+function openTextInput(x, y) {
+  pendingPos = { x, y };
+  Object.assign(textInputWrap.style, { display: 'block', left: x + '%', top: y + '%' });
+  // Apply current color as border hint
+  textInputField.style.borderColor = S.color;
+  textInputField.value = '';
+  setTimeout(() => textInputField.focus(), 0);
 }
 
-function appendBadge(m, r, num) {
-  const badge = document.createElement('div');
-  badge.className = 'mk-num';
-  // Offset badge so it doesn't overlap the circle center
-  const offset = r / 2 + 2;
-  badge.style.cssText =
-    `left:calc(${m.x}% + ${offset}px);top:calc(${m.y}% - ${offset}px);`;
-  badge.textContent = num;
-  imageContainer.appendChild(badge);
+function commitTextInput() {
+  if (!pendingPos) return;
+  const text = textInputField.value.trim();
+  textInputWrap.style.display = 'none';
+  const pos = pendingPos;
+  pendingPos = null;
+  if (!text) return;
+  S.annotations.push({
+    type: 'text', x: pos.x, y: pos.y, text,
+    color: S.color, size: S.textSize, bold: S.textBold, shadow: S.textShadow,
+  });
+  renderAnnotations();
+  updateBadge();
+  toast(`文字已添加："${text.length > 12 ? text.slice(0, 12) + '…' : text}"`);
+}
+
+textInputField.addEventListener('keydown', e => {
+  if (e.key === 'Enter')  { e.preventDefault(); commitTextInput(); }
+  if (e.key === 'Escape') { textInputWrap.style.display = 'none'; pendingPos = null; }
+  e.stopPropagation(); // prevent Ctrl+Z from firing while typing
+});
+// blur commit (e.g. clicking elsewhere)
+textInputField.addEventListener('blur', () => setTimeout(commitTextInput, 120));
+
+// ================================================================
+// RENDER ANNOTATIONS
+// ================================================================
+function renderAnnotations() {
+  // Remove all dynamic children (keep img, rectPreview, textInputWrap)
+  const keep = new Set([previewImg, rectPreview, textInputWrap]);
+  [...imageContainer.children].forEach(el => { if (!keep.has(el)) el.remove(); });
+
+  if (S.annotations.length === 0) return;
+
+  const r = S.markerSize;
+  const markers = S.annotations.filter(a => a.type === 'marker');
+
+  // ── Style B: spotlight SVG (goes in first, z-index 1) ──
+  if (S.style === 'B' && markers.length > 0) {
+    const spotR = Math.max(10, Math.round(r * 0.75));
+    const circles = markers.map(m =>
+      `<circle cx="${m.x}%" cy="${m.y}%" r="${spotR}" fill="black"/>`
+    ).join('');
+    const ns  = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('class', 'mk-spotlight');
+    svg.innerHTML =
+      `<defs><mask id="t-smask"><rect width="100%" height="100%" fill="white"/>` +
+      circles + `</mask></defs>` +
+      `<rect width="100%" height="100%" fill="rgba(0,0,0,0.72)" mask="url(#t-smask)"/>`;
+    imageContainer.insertBefore(svg, rectPreview);
+  }
+
+  // ── Render each annotation ──
+  let markerIdx = 0;
+  S.annotations.forEach((ann) => {
+
+    if (ann.type === 'marker') {
+      markerIdx++;
+      if (S.style === 'A') {
+        const dot = document.createElement('div');
+        dot.className = 'mk-circle';
+        dot.style.cssText =
+          `left:${ann.x}%;top:${ann.y}%;` +
+          `width:${r}px;height:${r}px;` +
+          `border-color:${ann.color || S.color};`;
+        insertBeforeControls(dot);
+      }
+      // Number badge
+      const off = (S.style === 'A' ? r : Math.max(10, r * 0.75)) / 2 + 3;
+      const badge = document.createElement('div');
+      badge.className = 'mk-num';
+      badge.style.cssText =
+        `left:calc(${ann.x}% + ${off}px);top:calc(${ann.y}% - ${off}px);`;
+      badge.textContent = markerIdx;
+      insertBeforeControls(badge);
+
+    } else if (ann.type === 'text') {
+      const label = document.createElement('div');
+      label.className = 'mk-text';
+      label.style.cssText =
+        `left:${ann.x}%;top:${ann.y}%;` +
+        `color:${ann.color};` +
+        `font-size:${ann.size}px;` +
+        `font-weight:${ann.bold ? 'bold' : 'normal'};` +
+        (ann.shadow
+          ? 'text-shadow:0 1px 3px rgba(0,0,0,0.95),0 0 8px rgba(0,0,0,0.7);'
+          : '');
+      label.textContent = ann.text;
+      insertBeforeControls(label);
+
+    } else if (ann.type === 'rect') {
+      const x1 = Math.min(ann.x1, ann.x2), x2 = Math.max(ann.x1, ann.x2);
+      const y1 = Math.min(ann.y1, ann.y2), y2 = Math.max(ann.y1, ann.y2);
+      const box = document.createElement('div');
+      box.className = 'mk-rect';
+      box.style.cssText =
+        `left:${x1}%;top:${y1}%;` +
+        `width:${x2 - x1}%;height:${y2 - y1}%;` +
+        `border-color:${ann.color};` +
+        `border-width:${ann.borderWidth}px;` +
+        `background:${ann.fill ? hexToRgba(ann.color, 0.18) : 'transparent'};` +
+        `box-shadow:0 0 5px ${hexToRgba(ann.color, 0.45)};`;
+      insertBeforeControls(box);
+    }
+  });
+}
+
+// Insert before the transient UI elements at the end
+function insertBeforeControls(el) {
+  imageContainer.insertBefore(el, rectPreview);
 }
 
 // ================================================================
 // CONTROLS
 // ================================================================
-function onStyleChange(s) {
-  S.style = s;
-  renderMarkers();
+function setTool(t) {
+  // Commit any pending text first
+  if (pendingPos) { commitTextInput(); }
+
+  S.tool = t;
+  document.querySelectorAll('.tool-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.tool === t)
+  );
+  $('opts-marker').style.display = t === 'marker' ? '' : 'none';
+  $('opts-text').style.display   = t === 'text'   ? '' : 'none';
+  $('opts-rect').style.display   = t === 'rect'   ? '' : 'none';
+
+  imageContainer.className = `cur-${t}`;
 }
 
-function onSizeInput(v) {
-  S.markerSize = parseInt(v, 10);
-  sizeDisplay.textContent = v + 'px';
-  renderMarkers();
+function onStyleChange(v) { S.style = v; renderAnnotations(); }
+function onMarkerSize(v) {
+  S.markerSize = +v;
+  $('markerSizeVal').textContent = v + 'px';
+  renderAnnotations();
+}
+function onTextSize(v) {
+  S.textSize = +v;
+  $('textSizeVal').textContent = v + 'px';
+}
+function onRectWidth(v) {
+  S.rectBorderWidth = +v;
+  $('rectWidthVal').textContent = v + 'px';
 }
 
 function undoLast() {
-  if (S.markers.length === 0) { toast('没有可撤销的标记'); return; }
-  S.markers.pop();
-  renderMarkers();
+  if (pendingPos) { textInputWrap.style.display = 'none'; pendingPos = null; return; }
+  if (S.annotations.length === 0) { toast('没有可撤销的标注'); return; }
+  S.annotations.pop();
+  renderAnnotations();
   updateBadge();
-  toast('已撤销最后一个标记');
+  toast('已撤销最后一个标注');
 }
 
 function clearAll() {
-  if (S.markers.length === 0) return;
-  S.markers = [];
-  renderMarkers();
+  if (S.annotations.length === 0) return;
+  S.annotations = [];
+  renderAnnotations();
   updateBadge();
   outputPanel.style.display = 'none';
-  toast('已清除所有标记');
+  toast('已清除所有标注');
 }
 
 function updateBadge() {
-  const n = S.markers.length;
+  const n = S.annotations.length;
   countBadge.textContent = n;
   countBadge.className = n === 0 ? 'zero' : '';
 }
 
-// Ctrl+Z shortcut
 document.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey && document.activeElement !== textInputField) {
     e.preventDefault();
     undoLast();
   }
@@ -576,29 +813,93 @@ document.addEventListener('keydown', e => {
 // CODE GENERATION
 // ================================================================
 function generateCode() {
-  if (!S.imageDataUrl) { toast('请先上传图片！'); return; }
-  if (S.markers.length === 0) { toast('请先点击图片添加至少一个标记！'); return; }
+  if (!S.imageDataUrl)        { toast('请先上传图片！'); return; }
+  if (S.annotations.length === 0) { toast('请先添加至少一个标注！'); return; }
 
-  const imgSrc = S.imageDataUrl;
-  const r = S.markerSize;
+  const r  = S.markerSize;
+  const markers  = S.annotations.filter(a => a.type === 'marker');
+  const texts    = S.annotations.filter(a => a.type === 'text');
+  const rects    = S.annotations.filter(a => a.type === 'rect');
 
-  let html, css;
+  const usedTypes = new Set(S.annotations.map(a => a.type));
+  const markerStyle = markers.length > 0 ? S.style : null;
 
-  if (S.style === 'A') {
-    /* ---- Style A: Breathing circles ---- */
-    const marks = S.markers.map(m =>
-      `  <div class="anki-mark" style="left:${m.x}%;top:${m.y}%"></div>`
+  // ── HTML ──
+  const lines = [
+    '<div class="anki-wrap">',
+    `  <img class="anki-img" src="${S.imageDataUrl}">`,
+  ];
+
+  // Marker A: individual divs
+  if (markerStyle === 'A') {
+    markers.forEach(m =>
+      lines.push(`  <div class="anki-mark" style="left:${m.x}%;top:${m.y}%"></div>`)
+    );
+  }
+
+  // Marker B: spotlight SVG
+  if (markerStyle === 'B') {
+    const spotR = Math.max(10, Math.round(r * 0.75));
+    const circles = markers.map(m =>
+      `      <circle cx="${m.x}%" cy="${m.y}%" r="${spotR}" fill="black"/>`
     ).join('\n');
+    lines.push(
+      '  <svg class="anki-spot" xmlns="http://www.w3.org/2000/svg">',
+      '    <defs><mask id="anki-smask">',
+      '      <rect width="100%" height="100%" fill="white"/>',
+      circles,
+      '    </mask></defs>',
+      '    <rect width="100%" height="100%"',
+      '          fill="rgba(0,0,0,0.72)" mask="url(#anki-smask)"/>',
+      '  </svg>',
+    );
+  }
 
-    html =
-`<div class="anki-wrap">
-  <img class="anki-img" src="${imgSrc}">
-${marks}
-</div>`;
+  // Text labels
+  texts.forEach(t => {
+    const fw = t.bold ? 'bold' : 'normal';
+    const ts = t.shadow
+      ? ' text-shadow:0 1px 3px rgba(0,0,0,0.9),0 0 8px rgba(0,0,0,0.65);'
+      : '';
+    lines.push(
+      `  <div class="anki-label" style="left:${t.x}%;top:${t.y}%;` +
+      `color:${t.color};font-size:${t.size}px;font-weight:${fw};${ts}">` +
+      `${escHtml(t.text)}</div>`
+    );
+  });
 
-    css =
-`/* ── Anki 视觉焦点：呼吸光圈 ── */
-.anki-wrap {
+  // Rectangles
+  rects.forEach(rect => {
+    const x1 = Math.min(rect.x1, rect.x2), x2 = Math.max(rect.x1, rect.x2);
+    const y1 = Math.min(rect.y1, rect.y2), y2 = Math.max(rect.y1, rect.y2);
+    const bg = rect.fill ? `background:${hexToRgba(rect.color, 0.18)};` : '';
+    lines.push(
+      `  <div class="anki-rect" style="` +
+      `left:${x1}%;top:${y1}%;width:${x2-x1}%;height:${y2-y1}%;` +
+      `border-color:${rect.color};border-width:${rect.borderWidth}px;${bg}` +
+      `"></div>`
+    );
+  });
+
+  lines.push('</div>');
+  const html = lines.join('\n');
+
+  // ── CSS ──
+  const css = buildCss(usedTypes, markerStyle, r);
+
+  $('htmlOut').value = html;
+  $('cssOut').value  = css;
+  outputPanel.style.display = 'block';
+  outputPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  toast('代码已生成！图片已内嵌为 base64，直接粘贴使用');
+}
+
+function buildCss(usedTypes, markerStyle, r) {
+  const parts = [];
+
+  // Base
+  parts.push(
+`.anki-wrap {
   position: relative;
   display: inline-block;
   max-width: 100%;
@@ -608,7 +909,12 @@ ${marks}
   display: block;
   max-width: 100%;
   height: auto;
-}
+}`);
+
+  // Marker A
+  if (markerStyle === 'A') {
+    parts.push(
+`/* 焦点圈 — 呼吸动画 */
 .anki-mark {
   position: absolute;
   width: ${r}px;
@@ -617,80 +923,79 @@ ${marks}
   margin-top: -${r/2}px;
   border-radius: 50%;
   border: 2.5px solid #ff3e3e;
-  box-shadow: 0 0 8px rgba(255,62,62,0.75);
+  box-shadow: 0 0 8px rgba(255,62,62,0.7);
   animation: ankiBreathe 1.6s ease-in-out infinite;
   pointer-events: none;
 }
 @keyframes ankiBreathe {
   0%, 100% { transform: scale(1);   opacity: 1;    }
   50%       { transform: scale(1.8); opacity: 0.18; }
-}`;
+}`);
+  }
 
-  } else {
-    /* ---- Style B: Spotlight mask ---- */
-    const spotR = Math.max(12, Math.round(r * 0.75));
-
-    const circles = S.markers.map(m =>
-      `      <circle cx="${m.x}%" cy="${m.y}%" r="${spotR}" fill="black"/>`
-    ).join('\n');
-
-    html =
-`<div class="anki-wrap">
-  <img class="anki-img" src="${imgSrc}">
-  <svg class="anki-spot" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <mask id="anki-smask">
-        <rect width="100%" height="100%" fill="white"/>
-${circles}
-      </mask>
-    </defs>
-    <rect width="100%" height="100%"
-          fill="rgba(0,0,0,0.72)"
-          mask="url(#anki-smask)"/>
-  </svg>
-</div>`;
-
-    css =
-`/* ── Anki 视觉焦点：聚光灯遮罩 ── */
-.anki-wrap {
-  position: relative;
-  display: inline-block;
-  max-width: 100%;
-  line-height: 0;
-}
-.anki-img {
-  display: block;
-  max-width: 100%;
-  height: auto;
-}
+  // Marker B
+  if (markerStyle === 'B') {
+    parts.push(
+`/* 焦点圈 — 聚光灯遮罩 */
 .anki-spot {
   position: absolute;
   top: 0; left: 0;
-  width: 100%;
-  height: 100%;
+  width: 100%; height: 100%;
   pointer-events: none;
-}`;
+}`);
   }
 
-  $('htmlOut').value = html;
-  $('cssOut').value  = css;
-  outputPanel.style.display = 'block';
-  outputPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  toast('代码已生成！图片已内嵌为 base64，可直接粘贴使用');
+  // Text label
+  if (usedTypes.has('text')) {
+    parts.push(
+`/* 文字标注 */
+.anki-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+  line-height: 1.2;
+}`);
+  }
+
+  // Rect
+  if (usedTypes.has('rect')) {
+    parts.push(
+`/* 矩形标注 */
+.anki-rect {
+  position: absolute;
+  border-style: solid;
+  pointer-events: none;
+  z-index: 3;
+}`);
+  }
+
+  return parts.join('\n\n');
 }
 
 // ================================================================
-// COPY
+// UTILS
 // ================================================================
-function copyCode(textareaId, flashId) {
-  const ta = $(textareaId);
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function hexToRgba(hex, alpha) {
+  const h = hex.replace('#','');
+  const r = parseInt(h.slice(0,2), 16);
+  const g = parseInt(h.slice(2,4), 16);
+  const b = parseInt(h.slice(4,6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function copyCode(taId, flashId) {
+  const ta = $(taId);
   if (!ta.value) { toast('没有可复制的内容'); return; }
-  // Modern API first, fallback to execCommand
   if (navigator.clipboard) {
     navigator.clipboard.writeText(ta.value).then(() => showFlash(flashId));
   } else {
-    ta.select();
-    document.execCommand('copy');
+    ta.select(); document.execCommand('copy');
     showFlash(flashId);
   }
 }
@@ -702,9 +1007,6 @@ function showFlash(id) {
   toast('已复制到剪贴板');
 }
 
-// ================================================================
-// TOAST
-// ================================================================
 let toastTimer;
 function toast(msg) {
   const el = $('toast');
